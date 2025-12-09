@@ -15,7 +15,7 @@
                 background: linear-gradient(to bottom, #2b5279 5%, #6485a4 60%);
             }
             body{
-                background: url(/img/leaf-bg.png);
+                background: url(assets/img/leaf-bg.png) no-repeat;
                 background-size: 180vw;
                 background-position-x: -80vw;
                 background-repeat: no-repeat;
@@ -279,42 +279,43 @@
                         return;
                     }
                     
-                    // ??????
+                    // Read the file and upload once the base64 data URL is ready
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        $('#preview-container').html(`<img src="${e.target.result}" alt="Preview">`);
+                        const dataUrl = e.target.result;
+                        $('#preview-container').html(`<img src="${dataUrl}" alt="Preview">`);
+
+                        // Upload the image as base64 JSON to avoid multipart parsing issues on dev server
+                        const payload = {
+                            filename: file.name || (`upload_${Date.now()}.png`),
+                            data: dataUrl
+                        };
+
+                        $.ajax({
+                            url: '/api/upload-image', // Local development upload endpoint (JSON)
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify(payload),
+                            success: function(response) {
+                                console.log('?? Upload response:', response);
+                                if (response && response.code === 1) {
+                                    alert(_t('Upload successful'));
+                                    tupian = response.data; // server returns URL
+                                    console.log('? Image URL set to:', tupian);
+                                    $('#file-upload').val('');
+                                } else {
+                                    var msg = (response && (response.data || response.error)) || 'Upload failed';
+                                    alert(_t(msg));
+                                    $('#file-upload').val('');
+                                }
+                            },
+                            error: function(xhr, status, err) {
+                                console.error('Upload failed:', status, err, xhr && xhr.responseText);
+                                alert(_t('Upload failed. Please try again.'));
+                            }
+                        });
                     };
                     reader.readAsDataURL(file);
-                    
-                    // ?? FormData ???
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    
-                    $.ajax({
-                        url: '/api/upload-image', // Local development upload endpoint
-                        type: 'POST',
-                        data: formData,
-                        contentType: false,
-                        processData: false,
-                        success: function(response) {
-                            console.log('?? Upload response:', response);
-                            if (response && response.code === 1) {
-                                alert(_t('????'));
-                                tupian = response.data;
-                                console.log('? Image URL set to:', tupian);
-                                $('#file-upload').val('');
-                                // show preview already handled by reader
-                            } else {
-                                var msg = (response && (response.data || response.error)) || 'Upload failed';
-                                alert(_t(msg));
-                                $('#file-upload').val('');
-                            }
-                        },
-                        error: function(xhr, status, err) {
-                            console.error('Upload failed:', status, err, xhr && xhr.responseText);
-                            alert(_t('Upload failed. Please try again.'));
-                        }
-                    });
                 });
                 
                 // Ensure the Confirm div is clickable and has pointer cursor

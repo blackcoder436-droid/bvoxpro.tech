@@ -16,7 +16,8 @@
                 background: linear-gradient(to bottom, #2b5279 5%, #6485a4 60%);
             }
             body{
-                background: url(/img/leaf-bg.png);
+                overflow-y: hidden;
+                background: url(/assets/img/leaf-bg.png );
                 background-size: 180vw;
                 background-position-x: -80vw;
                 background-repeat: no-repeat;
@@ -222,6 +223,7 @@
                     });
 
                     const status = record.status || 'pending';
+                    const qtyVal = Number(record.quantity || record.amount || 0) || 0;
                     html += `
                         <div class="y-re-box">
                             <div class="y-re-box-left">
@@ -236,7 +238,7 @@
                             </div>
                             <div class="y-re-box-amount">
                                 <div class="y-re-box-status-badge ${status}">${status}</div>
-                                <div class="y-re-box-amount-value">-${record.quantity.toFixed(2)}</div>
+                                <div class="y-re-box-amount-value">-${qtyVal.toFixed(2)}</div>
                             </div>
                         </div>
                     `;

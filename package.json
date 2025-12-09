@@ -4,12 +4,15 @@
   "description": "BVOX Finance - Cryptocurrency Trading Platform with WalletConnect & Database",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node app-server.js",
+    "dev": "nodemon app-server.js",
     "server": "node server.js",
+    "app": "node app-server.js",
+    "setup": "node setup-config.js",
+    "migrate": "node scripts/migrate-json-to-db.js",
     "backend": "node backend-server.js",
     "backend:dev": "nodemon backend-server.js",
-    "dev:all": "concurrently \"node server.js\" \"node backend-server.js\"",
+    "dev:all": "concurrently \"node app-server.js\" \"node backend-server.js\"",
     "install:deps": "npm install express cors dotenv ethers mongoose bcryptjs jsonwebtoken"
   },
   "keywords": [

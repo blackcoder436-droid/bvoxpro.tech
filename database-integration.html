@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Integration Example - BVOX Finance</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.1em; opacity: 0.9; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+        .card:hover { transform: translateY(-5px); }
+        .card h2 { color: #667eea; margin-bottom: 15px; font-size: 1.3em; }
+        .code-block {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            overflow-x: auto;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin: 5px 0;
+        }
+        .status-ok { background: #4caf50; color: white; }
+        .status-warning { background: #ff9800; color: white; }
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #764ba2; }
+        .result { 
+            background: #f9f9f9; 
+            border-left: 4px solid #667eea;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success { border-left-color: #4caf50; }
+        .error { border-left-color: #f44336; }
+        .list-group { margin: 15px 0; }
+        .list-item {
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .list-item small { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 BVOX Finance - Database Integration</h1>
+            <p>Real-time API Examples & Testing</p>
+        </div>
+
+        <div class="grid">
+            <!-- User API -->
+            <div class="card">
+                <h2>👤 User Management</h2>
+                <p>Fetch and manage user data</p>
+                
+                <input type="text" id="userId" placeholder="Enter User ID" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testGetUser()">Get User</button>
+                <button class="btn" onclick="testUpdateBalance()">Update Balance</button>
+                <button class="btn" onclick="testGetAllUsers()">List Users</button>
+                
+                <div id="userResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Topup API -->
+            <div class="card">
+                <h2>💰 Topup Records</h2>
+                <p>Create and retrieve topup transactions</p>
+                
+                <input type="text" id="topupUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="topupCoin" placeholder="Coin (BTC, USDT, etc.)" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="topupAmount" placeholder="Amount" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testCreateTopup()">Create Topup</button>
+                <button class="btn" onclick="testGetTopups()">Get Records</button>
+                
+                <div id="topupResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Withdrawal API -->
+            <div class="card">
+                <h2>💸 Withdrawals</h2>
+                <p>Process withdrawal requests</p>
+                
+                <input type="text" id="withdrawalUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="withdrawalCoin" placeholder="Coin" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="withdrawalAddress" placeholder="Address" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="withdrawalAmount" placeholder="Amount" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testCreateWithdrawal()">Request Withdrawal</button>
+                <button class="btn" onclick="testGetWithdrawals()">View History</button>
+                
+                <div id="withdrawalResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Trade API -->
+            <div class="card">
+                <h2>📈 Trading</h2>
+                <p>Create and manage trades</p>
+                
+                <input type="text" id="tradeUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="tradePair" placeholder="Pair (BTC/USDT)" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="tradePrice" placeholder="Entry Price" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="tradeAmount" placeholder="Amount" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testCreateTrade()">Open Trade</button>
+                <button class="btn" onclick="testGetTrades()">My Trades</button>
+                
+                <div id="tradeResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Mining API -->
+            <div class="card">
+                <h2>⛏️ Mining</h2>
+                <p>Manage mining operations</p>
+                
+                <input type="text" id="miningUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="miningAmount" placeholder="Investment Amount" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="miningDaily" placeholder="Daily Reward (%)" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testCreateMining()">Start Mining</button>
+                <button class="btn" onclick="testGetMining()">My Mining</button>
+                
+                <div id="miningResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Wallet API -->
+            <div class="card">
+                <h2>🔐 Wallets</h2>
+                <p>Manage user wallets</p>
+                
+                <input type="text" id="walletUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="walletAddress" placeholder="Wallet Address (0x...)" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testCreateWallet()">Add Wallet</button>
+                <button class="btn" onclick="testGetWallets()">My Wallets</button>
+                
+                <div id="walletResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- KYC API -->
+            <div class="card">
+                <h2>📋 KYC Verification</h2>
+                <p>Handle know-your-customer verification</p>
+                
+                <input type="text" id="kycUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="kycName" placeholder="Full Name" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="kycDocument" placeholder="Document Number" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testSubmitKYC()">Submit KYC</button>
+                <button class="btn" onclick="testGetKYC()">Check Status</button>
+                
+                <div id="kycResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Arbitrage API -->
+            <div class="card">
+                <h2>🤖 AI Arbitrage</h2>
+                <p>Manage arbitrage subscriptions</p>
+                
+                <input type="text" id="arbUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="arbProductId" placeholder="Product ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="number" id="arbAmount" placeholder="Investment Amount" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testGetProducts()">View Products</button>
+                <button class="btn" onclick="testSubscribeArbitrage()">Subscribe</button>
+                <button class="btn" onclick="testGetSubscriptions()">My Subscriptions</button>
+                
+                <div id="arbResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- Notifications API -->
+            <div class="card">
+                <h2>🔔 Notifications</h2>
+                <p>Manage user notifications</p>
+                
+                <input type="text" id="notifUserId" placeholder="User ID" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="notifTitle" placeholder="Title" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" id="notifMessage" placeholder="Message" style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <button class="btn" onclick="testCreateNotification()">Send Notification</button>
+                <button class="btn" onclick="testGetNotifications()">Get Notifications</button>
+                
+                <div id="notifResult" class="result" style="display:none;"></div>
+            </div>
+
+            <!-- API Status -->
+            <div class="card">
+                <h2>📡 API Status</h2>
+                <p>Check server health and configuration</p>
+                
+                <button class="btn" onclick="testHealthCheck()" style="width: 100%; margin: 10px 0;">Check Server Health</button>
+                <button class="btn" onclick="testConnectionTest()" style="width: 100%; margin: 10px 0;">Test Database Connection</button>
+                
+                <div id="statusResult" class="result" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div style="background: white; padding: 30px; border-radius: 10px; margin-top: 40px;">
+            <h2 style="color: #667eea; margin-bottom: 20px;">📚 Integration Guide</h2>
+            <h3>Step 1: Include API Client in Your HTML</h3>
+            <div class="code-block">
+&lt;script src="/js/api-client.js"&gt;&lt;/script&gt;
+            </div>
+            
+            <h3>Step 2: Use API Functions in Your JavaScript</h3>
+            <div class="code-block">
+// Get user data
+const user = await API.users.getById('userId123');
+
+// Create topup
+const topup = await API.topup.create({
+    user_id: '123',
+    coin: 'BTC',
+    address: '1A1z7agoat3oPLCsF81efx3LAG5xfqc5z',
+    amount: 0.5,
+    photo_url: '/uploads/proof.png'
+});
+
+// Update user balance
+await API.users.updateBalance('userId123', 1000);
+
+// Get user's trades
+const trades = await API.trade.getRecords('userId123');
+
+// Create notification
+await API.notification.create({
+    user_id: '123',
+    title: 'Payment Received',
+    message: 'Your topup has been approved',
+    type: 'success'
+});
+            </div>
+
+            <h3>Step 3: Run Migration Script (First Time Only)</h3>
+            <div class="code-block">
+node scripts/migrate-json-to-db.js
+            </div>
+
+            <h3>Step 4: Start the Server</h3>
+            <div class="code-block">
+npm install
+node app-server.js
+            </div>
+
+            <h3>Environment Variables (.env)</h3>
+            <div class="code-block">
+MONGODB_URI=mongodb://localhost:27017/bvox_finance
+PORT=3000
+            </div>
+
+            <h3>🎯 Quick Testing</h3>
+            <p style="margin-top: 15px;">Use the forms above to test all API endpoints in real-time. Results will be displayed below each section.</p>
+        </div>
+    </div>
+
+    <script src="/js/api-client.js"></script>
+    <script src="/js/frontend-bindings.js"></script>
+    <script>
+        async function showResult(elementId, data, isError = false) {
+            const elem = document.getElementById(elementId);
+            elem.innerHTML = JSON.stringify(data, null, 2);
+            elem.className = 'result ' + (isError ? 'error' : 'success');
+            elem.style.display = 'block';
+        }
+
+        // User API Tests
+        async function testGetUser() {
+            try {
+                clearUserUI();
+                const userId = document.getElementById('userId').value;
+                if (!userId) {
+                    showResult('userResult', { error: 'Please enter a User ID' }, true);
+                    return;
+                }
+
+                const result = await API.users.getById(userId);
+                if (!result) {
+                    showResult('userResult', { error: 'User not found' }, true);
+                    return;
+                }
+
+                // Populate UI with real data
+                populateUserUI(result);
+                showResult('userResult', result);
+            } catch (e) {
+                showResult('userResult', { error: e.message }, true);
+            }
+        }
+
+        async function testUpdateBalance() {
+            try {
+                const userId = document.getElementById('userId').value || 'user123';
+                const result = await API.users.updateBalance(userId, 1500);
+                showResult('userResult', result);
+            } catch (e) {
+                showResult('userResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetAllUsers() {
+            try {
+                const result = await API.users.getAll(10);
+                showResult('userResult', result);
+            } catch (e) {
+                showResult('userResult', { error: e.message }, true);
+            }
+        }
+
+        // Topup Tests
+        async function testCreateTopup() {
+            try {
+                const userId = document.getElementById('topupUserId').value;
+                const coin = document.getElementById('topupCoin').value;
+                const amount = document.getElementById('topupAmount').value;
+                
+                if (!userId || !coin || !amount) {
+                    showResult('topupResult', { error: 'Please fill in all fields: User ID, Coin, Amount' }, true);
+                    return;
+                }
+
+                const data = {
+                    user_id: userId,
+                    coin: coin,
+                    address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+                    amount: parseFloat(amount),
+                    photo_url: '/uploads/proof_sample.png'
+                };
+                
+                console.log('Creating topup with data:', data);
+                const result = await API.topup.create(data);
+                showResult('topupResult', result);
+            } catch (e) {
+                showResult('topupResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetTopups() {
+            try {
+                const userId = document.getElementById('topupUserId').value || 'user123';
+                const result = await API.topup.getRecords(userId);
+                showResult('topupResult', result);
+            } catch (e) {
+                showResult('topupResult', { error: e.message }, true);
+            }
+        }
+
+        // Withdrawal Tests
+        async function testCreateWithdrawal() {
+            try {
+                const userId = document.getElementById('withdrawalUserId').value;
+                const coin = document.getElementById('withdrawalCoin').value;
+                const address = document.getElementById('withdrawalAddress').value;
+                const amount = document.getElementById('withdrawalAmount').value;
+                
+                if (!userId || !coin || !address || !amount) {
+                    showResult('withdrawalResult', { error: 'Please fill in all fields' }, true);
+                    return;
+                }
+
+                const data = {
+                    user_id: userId,
+                    coin: coin,
+                    address: address,
+                    amount: parseFloat(amount)
+                };
+                const result = await API.withdrawal.create(data);
+                showResult('withdrawalResult', result);
+            } catch (e) {
+                showResult('withdrawalResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetWithdrawals() {
+            try {
+                const userId = document.getElementById('withdrawalUserId').value;
+                if (!userId) {
+                    showResult('withdrawalResult', { error: 'Please enter User ID' }, true);
+                    return;
+                }
+                const result = await API.withdrawal.getRecords(userId);
+                showResult('withdrawalResult', result);
+            } catch (e) {
+                showResult('withdrawalResult', { error: e.message }, true);
+            }
+        }
+
+        // Trade Tests
+        async function testCreateTrade() {
+            try {
+                const userId = document.getElementById('tradeUserId').value;
+                const pair = document.getElementById('tradePair').value;
+                const price = document.getElementById('tradePrice').value;
+                const amount = document.getElementById('tradeAmount').value;
+                
+                if (!userId || !pair || !price || !amount) {
+                    showResult('tradeResult', { error: 'Please fill in all fields' }, true);
+                    return;
+                }
+
+                const data = {
+                    user_id: userId,
+                    pair: pair,
+                    type: 'long',
+                    entry_price: parseFloat(price),
+                    amount: parseFloat(amount),
+                    leverage: 2
+                };
+                const result = await API.trade.create(data);
+                showResult('tradeResult', result);
+            } catch (e) {
+                showResult('tradeResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetTrades() {
+            try {
+                const userId = document.getElementById('tradeUserId').value;
+                if (!userId) {
+                    showResult('tradeResult', { error: 'Please enter User ID' }, true);
+                    return;
+                }
+                const result = await API.trade.getRecords(userId);
+                showResult('tradeResult', result);
+            } catch (e) {
+                showResult('tradeResult', { error: e.message }, true);
+            }
+        }
+
+        // Mining Tests
+        async function testCreateMining() {
+            try {
+                const userId = document.getElementById('miningUserId').value;
+                const amount = document.getElementById('miningAmount').value;
+                
+                if (!userId || !amount) {
+                    showResult('miningResult', { error: 'Please fill in all fields' }, true);
+                    return;
+                }
+
+                const data = {
+                    user_id: userId,
+                    package_id: 'pkg_basic',
+                    amount: parseFloat(amount),
+                    daily_reward: 2.5
+                };
+                const result = await API.mining.create(data);
+                showResult('miningResult', result);
+            } catch (e) {
+                showResult('miningResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetMining() {
+            try {
+                const userId = document.getElementById('miningUserId').value;
+                if (!userId) {
+                    showResult('miningResult', { error: 'Please enter User ID' }, true);
+                    return;
+                }
+                const result = await API.mining.getRecords(userId);
+                showResult('miningResult', result);
+            } catch (e) {
+                showResult('miningResult', { error: e.message }, true);
+            }
+        }
+
+        // Wallet Tests
+        async function testCreateWallet() {
+            try {
+                const userId = document.getElementById('walletUserId').value;
+                const address = document.getElementById('walletAddress').value;
+                
+                if (!userId || !address) {
+                    showResult('walletResult', { error: 'Please fill in all fields' }, true);
+                    return;
+                }
+
+                const data = {
+                    user_id: userId,
+                    address: address,
+                    chain: 'ethereum',
+                    balance: 0,
+                    is_primary: true
+                };
+                const result = await API.wallet.create(data);
+                showResult('walletResult', result);
+            } catch (e) {
+                showResult('walletResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetWallets() {
+            try {
+                const userId = document.getElementById('walletUserId').value;
+                if (!userId) {
+                    showResult('walletResult', { error: 'Please enter User ID' }, true);
+                    return;
+                }
+                const result = await API.wallet.getByUserId(userId);
+                showResult('walletResult', result);
+            } catch (e) {
+                showResult('walletResult', { error: e.message }, true);
+            }
+        }
+
+        // KYC Tests
+        async function testSubmitKYC() {
+            try {
+                const userId = document.getElementById('kycUserId').value;
+                const fullName = document.getElementById('kycName').value;
+                const document = document.getElementById('kycDocument').value;
+                
+                if (!userId || !fullName || !document) {
+                    showResult('kycResult', { error: 'Please fill in all fields' }, true);
+                    return;
+                }
+
+                const data = {
+                    user_id: userId,
+                    full_name: fullName,
+                    date_of_birth: '1990-01-15',
+                    nationality: 'US',
+                    document_type: 'passport',
+                    document_number: document,
+                    document_image_url: '/uploads/passport.jpg',
+                    selfie_url: '/uploads/selfie.jpg'
+                };
+                const result = await API.kyc.submit(data);
+                showResult('kycResult', result);
+            } catch (e) {
+                showResult('kycResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetKYC() {
+            try {
+                const userId = document.getElementById('kycUserId').value;
+                const result = await API.kyc.getStatus(userId);
+                showResult('kycResult', result);
+            } catch (e) {
+                showResult('kycResult', { error: e.message }, true);
+            }
+        }
+
+        // Arbitrage Tests
+        async function testGetProducts() {
+            try {
+                const result = await API.arbitrage.getProducts(10);
+                showResult('arbResult', result);
+            } catch (e) {
+                showResult('arbResult', { error: e.message }, true);
+            }
+        }
+
+        async function testSubscribeArbitrage() {
+            try {
+                const data = {
+                    user_id: document.getElementById('arbUserId').value || 'user123',
+                    product_id: document.getElementById('arbProductId').value || 'prod_1',
+                    amount: parseFloat(document.getElementById('arbAmount').value) || 500,
+                    daily_return: 1.5,
+                    total_return: 45
+                };
+                const result = await API.arbitrage.subscribe(data);
+                showResult('arbResult', result);
+            } catch (e) {
+                showResult('arbResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetSubscriptions() {
+            try {
+                const userId = document.getElementById('arbUserId').value || 'user123';
+                const result = await API.arbitrage.getSubscriptions(userId);
+                showResult('arbResult', result);
+            } catch (e) {
+                showResult('arbResult', { error: e.message }, true);
+            }
+        }
+
+        // Notification Tests
+        async function testCreateNotification() {
+            try {
+                const data = {
+                    user_id: document.getElementById('notifUserId').value || 'user123',
+                    title: document.getElementById('notifTitle').value || 'Payment Received',
+                    message: document.getElementById('notifMessage').value || 'Your transaction was successful',
+                    type: 'success'
+                };
+                const result = await API.notification.create(data);
+                showResult('notifResult', result);
+            } catch (e) {
+                showResult('notifResult', { error: e.message }, true);
+            }
+        }
+
+        async function testGetNotifications() {
+            try {
+                const userId = document.getElementById('notifUserId').value || 'user123';
+                const result = await API.notification.get(userId);
+                showResult('notifResult', result);
+            } catch (e) {
+                showResult('notifResult', { error: e.message }, true);
+            }
+        }
+
+        // Status Tests
+        async function testHealthCheck() {
+            try {
+                const result = await API.request('GET', '/api/health');
+                showResult('statusResult', result);
+            } catch (e) {
+                showResult('statusResult', { error: e.message }, true);
+            }
+        }
+
+        async function testConnectionTest() {
+            try {
+                const result = await API.users.getAll(1);
+                showResult('statusResult', { message: 'Database connection successful', recordCount: result.length });
+            } catch (e) {
+                showResult('statusResult', { error: 'Database connection failed: ' + e.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>

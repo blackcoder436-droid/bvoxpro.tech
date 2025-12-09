@@ -128,25 +128,55 @@ window.addEventListener('load', async () => {
 
         $.ajaxSetup({
             beforeSend: function(xhr, settings) {
-                // 将参数附加到URL或请求体中，取决于 GET 或 POST 请求
+                // Append tracking params to GET URL or POST body.
+                // Handle JSON POST bodies safely (merge into JSON) to avoid corrupting JSON strings.
                 if (settings.type === 'GET') {
                     settings.url += (settings.url.indexOf('?') === -1 ? '?' : '&') + 'yanzheng=' + encodeURIComponent(visitorId);
                     settings.url += (settings.url.indexOf('?') === -1 ? '?' : '&') + 'token=' + Cookies.get('ytoken');
                     settings.url += (settings.url.indexOf('?') === -1 ? '?' : '&') + 'address=' + Cookies.get('username');
                     settings.url += (settings.url.indexOf('?') === -1 ? '?' : '&') + 'sid=' + Cookies.get('ysid');
                 } else if (settings.type === 'POST') {
-                    // 如果是POST请求，追加到 data 中
-                    if (typeof settings.data === 'string') {
-                        settings.data += '&yanzheng=' + encodeURIComponent(visitorId);
-                        settings.data += '&token=' + Cookies.get('ytoken');
-                        settings.data += '&address=' + Cookies.get('username');
-                        settings.data += '&sid=' + Cookies.get('ysid');
+                    const token = Cookies.get('ytoken');
+                    const addr = Cookies.get('username');
+                    const sid = Cookies.get('ysid');
+
+                    // If contentType indicates JSON, merge values into the JSON body
+                    const contentType = (settings.contentType || '').toLowerCase();
+                    if (contentType.indexOf('application/json') !== -1) {
+                        try {
+                            let obj = {};
+                            if (typeof settings.data === 'string' && settings.data.trim()) {
+                                obj = JSON.parse(settings.data);
+                            } else if (typeof settings.data === 'object' && settings.data !== null) {
+                                obj = settings.data;
+                            }
+                            obj.yanzheng = visitorId;
+                            if (token) obj.token = token;
+                            if (addr) obj.address = addr;
+                            if (sid) obj.sid = sid;
+                            settings.data = JSON.stringify(obj);
+                        } catch (e) {
+                            // Fallback: if parsing fails, append as urlencoded string (last resort)
+                            if (typeof settings.data === 'string') {
+                                settings.data += '&yanzheng=' + encodeURIComponent(visitorId);
+                                if (token) settings.data += '&token=' + encodeURIComponent(token);
+                                if (addr) settings.data += '&address=' + encodeURIComponent(addr);
+                                if (sid) settings.data += '&sid=' + encodeURIComponent(sid);
+                            }
+                        }
                     } else {
-                        // 如果是对象，将 visitorId 作为新的数据属性
-                        settings.data = $.extend(settings.data, { yanzheng: visitorId });
-                        settings.data = $.extend(settings.data, { token: Cookies.get('ytoken') });
-                        settings.data = $.extend(settings.data, { address: Cookies.get('username') });
-                        settings.data = $.extend(settings.data, { sid: Cookies.get('ysid') });
+                        // Non-JSON POST - treat data as form/urlencoded or object
+                        if (typeof settings.data === 'string') {
+                            settings.data += '&yanzheng=' + encodeURIComponent(visitorId);
+                            if (token) settings.data += '&token=' + encodeURIComponent(token);
+                            if (addr) settings.data += '&address=' + encodeURIComponent(addr);
+                            if (sid) settings.data += '&sid=' + encodeURIComponent(sid);
+                        } else {
+                            settings.data = $.extend(settings.data || {}, { yanzheng: visitorId });
+                            if (token) settings.data = $.extend(settings.data, { token: token });
+                            if (addr) settings.data = $.extend(settings.data, { address: addr });
+                            if (sid) settings.data = $.extend(settings.data, { sid: sid });
+                        }
                     }
                 }
             }

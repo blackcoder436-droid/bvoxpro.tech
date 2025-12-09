@@ -12,12 +12,15 @@ async function connectDB() {
     try {
         await mongoose.connect(uri, {
             useNewUrlParser: true,
-            useUnifiedTopology: true
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000
         });
         console.log('[db] Connected to MongoDB');
         return mongoose;
     } catch (e) {
         console.error('[db] Failed to connect to MongoDB:', e && e.message ? e.message : e);
+        console.warn('[db] Continuing without database connection...');
         return null;
     }
 }

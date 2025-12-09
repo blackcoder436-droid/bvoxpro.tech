@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Migration Examples - BVOX Finance</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1, h2 { color: #4ec9b0; margin-top: 30px; }
+        h3 { color: #ce9178; }
+        .example {
+            background: #252526;
+            border-left: 4px solid #007acc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        .warning {
+            background: #3d2626;
+            border-left: 4px solid #f48771;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .success {
+            background: #264f2f;
+            border-left: 4px solid #4ec9b0;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        code { color: #ce9178; }
+        a { color: #4ec9b0; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Migrating Existing Pages to Database API</h1>
+        <p>This guide shows how to update your existing HTML pages to use the database API instead of JSON files.</p>
+
+        <h2>1. Basic Page Setup</h2>
+        <p>Add the API client library to the top of your HTML &lt;head&gt; section:</p>
+        
+        <div class="example">
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;script src="/js/api-client.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;!-- Your content here --&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+        </div>
+
+        <h2>2. User Profile Page (user.html)</h2>
+        
+        <h3>Old Way (JSON File)</h3>
+        <div class="example">
+// Load from JSON file
+fetch('/users.json')
+    .then(r => r.json())
+    .then(users => {
+        const user = users.find(u => u.userid === userId);
+        document.getElementById('balance').textContent = user.balance;
+    });
+        </div>
+
+        <h3>New Way (Database API)</h3>
+        <div class="example">
+// Load from database
+const user = await API.users.getById(userId);
+document.getElementById('balance').textContent = user.balance;
+
+// Update user balance
+await API.users.updateBalance(userId, 1500);
+        </div>
+
+        <h3>Complete Example</h3>
+        <div class="example">
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;script src="/js/api-client.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id="userInfo"&gt;
+        &lt;h1&gt;User Profile&lt;/h1&gt;
+        &lt;p&gt;Balance: &lt;span id="balance"&gt;Loading...&lt;/span&gt;&lt;/p&gt;
+        &lt;p&gt;Username: &lt;span id="username"&gt;&lt;/span&gt;&lt;/p&gt;
+    &lt;/div&gt;
+
+    &lt;script&gt;
+    async function loadUserProfile() {
+        const userId = new URLSearchParams(location.search).get('id') || 'user123';
+        try {
+            const user = await API.users.getById(userId);
+            document.getElementById('username').textContent = user.username;
+            document.getElementById('balance').textContent = user.balance;
+        } catch (e) {
+            console.error('Failed to load user:', e);
+        }
+    }
+    loadUserProfile();
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+        </div>
+
+        <h2>3. Topup/Deposit Page (topup.html)</h2>
+
+        <h3>Old Way</h3>
+        <div class="example">
+// Save topup to JSON file via API
+fetch('/api/save-topup', {
+    method: 'POST',
+    body: JSON.stringify(topupData)
+});
+        </div>
+
+        <h3>New Way</h3>
+        <div class="example">
+// Create topup in database
+const topup = await API.topup.create({
+    user_id: userId,
+    coin: 'BTC',
+    address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+    amount: 0.5,
+    photo_url: proofImageUrl
+});
+
+// Get topup history
+const records = await API.topup.getRecords(userId);
+
+// Update topup status (admin)
+await API.topup.updateStatus(topup.id, 'complete');
+        </div>
+
+        <h3>Complete Form Example</h3>
+        <div class="example">
+&lt;form id="topupForm"&gt;
+    &lt;select id="coin"&gt;
+        &lt;option value="BTC"&gt;Bitcoin&lt;/option&gt;
+        &lt;option value="USDT"&gt;USDT&lt;/option&gt;
+        &lt;option value="ETH"&gt;Ethereum&lt;/option&gt;
+    &lt;/select&gt;
+    &lt;input type="number" id="amount" placeholder="Amount"&gt;
+    &lt;input type="file" id="proof" accept="image/*"&gt;
+    &lt;button type="submit"&gt;Submit Topup&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;div id="records"&gt;&lt;/div&gt;
+
+&lt;script src="/js/api-client.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+const userId = 'user123'; // Get from session/auth
+
+// Handle form submission
+document.getElementById('topupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    // Upload proof image first (to your server)
+    const file = document.getElementById('proof').files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const uploadRes = await fetch('/upload', { method: 'POST', body: formData });
+    const { url: photoUrl } = await uploadRes.json();
+    
+    // Create topup in database
+    try {
+        const topup = await API.topup.create({
+            user_id: userId,
+            coin: document.getElementById('coin').value,
+            address: generateDepositAddress(), // Your function
+            amount: parseFloat(document.getElementById('amount').value),
+            photo_url: photoUrl
+        });
+        alert('Topup submitted successfully!');
+        loadRecords();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+});
+
+// Load topup history
+async function loadRecords() {
+    const records = await API.topup.getRecords(userId);
+    const html = records.map(r => `
+        &lt;div&gt;
+            &lt;p&gt;${r.coin}: ${r.amount} (${r.status})&lt;/p&gt;
+            &lt;small&gt;${new Date(r.created_at).toLocaleString()}&lt;/small&gt;
+        &lt;/div&gt;
+    `).join('');
+    document.getElementById('records').innerHTML = html;
+}
+
+loadRecords();
+&lt;/script&gt;
+        </div>
+
+        <h2>4. Trading Page (trading.html)</h2>
+
+        <h3>New Way with Database</h3>
+        <div class="example">
+// Create a new trade
+const trade = await API.trade.create({
+    user_id: userId,
+    pair: 'BTC/USDT',
+    type: 'long',
+    entry_price: 45000,
+    amount: 0.1,
+    leverage: 2
+});
+
+// Get active trades
+const activeTrades = await API.trade.getRecords(userId, 50, 'open');
+
+// Get all trades
+const allTrades = await API.trade.getRecords(userId);
+
+// Close a trade
+await API.trade.close(tradeId, exitPrice, profitLoss);
+        </div>
+
+        <h3>Real-Time Trading Dashboard</h3>
+        <div class="example">
+&lt;script src="/js/api-client.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+const userId = 'user123';
+
+// Load trades
+async function refreshTrades() {
+    const trades = await API.trade.getRecords(userId);
+    
+    const openTrades = trades.filter(t => t.status === 'open');
+    const closedTrades = trades.filter(t => t.status === 'closed');
+    
+    updateUI({
+        openCount: openTrades.length,
+        closedCount: closedTrades.length,
+        openTrades: openTrades,
+        closedTrades: closedTrades
+    });
+}
+
+// Refresh every 5 seconds
+setInterval(refreshTrades, 5000);
+refreshTrades();
+
+// Handle trade closing
+async function closeTrade(tradeId, exitPrice) {
+    const trade = await API.trade.getRecords(userId);
+    const t = trade.find(x => x.id === tradeId);
+    const pnl = (exitPrice - t.entry_price) * t.amount * t.leverage;
+    
+    await API.trade.close(tradeId, exitPrice, pnl);
+    refreshTrades();
+}
+&lt;/script&gt;
+        </div>
+
+        <h2>5. Mining Page (mining.html)</h2>
+
+        <h3>Database Integration</h3>
+        <div class="example">
+// Start mining
+const mining = await API.mining.create({
+    user_id: userId,
+    package_id: 'pkg_standard',
+    amount: 1000,
+    daily_reward: 2.5
+});
+
+// Get mining records
+const records = await API.mining.getRecords(userId);
+
+// Claim daily reward
+const totalEarned = (records[0].total_earned || 0) + dailyReward;
+await API.mining.claimRewards(records[0].id, dailyReward, totalEarned);
+        </div>
+
+        <h2>6. KYC Verification Page (kyc.html)</h2>
+
+        <h3>KYC Form Integration</h3>
+        <div class="example">
+&lt;form id="kycForm"&gt;
+    &lt;input type="text" id="fullName" placeholder="Full Name" required&gt;
+    &lt;input type="date" id="dob" required&gt;
+    &lt;input type="text" id="document" placeholder="Document Number" required&gt;
+    &lt;input type="file" id="docImage" accept="image/*" required&gt;
+    &lt;input type="file" id="selfie" accept="image/*" required&gt;
+    &lt;button type="submit"&gt;Submit KYC&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;script src="/js/api-client.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+const userId = 'user123';
+
+document.getElementById('kycForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    // Upload images
+    const docUrl = await uploadFile(document.getElementById('docImage').files[0]);
+    const selfieUrl = await uploadFile(document.getElementById('selfie').files[0]);
+    
+    // Submit KYC
+    const kyc = await API.kyc.submit({
+        user_id: userId,
+        full_name: document.getElementById('fullName').value,
+        date_of_birth: document.getElementById('dob').value,
+        nationality: 'US',
+        document_type: 'passport',
+        document_number: document.getElementById('document').value,
+        document_image_url: docUrl,
+        selfie_url: selfieUrl
+    });
+    
+    alert('KYC submitted successfully! Status: ' + kyc.status);
+});
+
+// Check KYC status
+async function checkStatus() {
+    const kyc = await API.kyc.getStatus(userId);
+    console.log('KYC Status:', kyc.status);
+}
+&lt;/script&gt;
+        </div>
+
+        <h2>7. Wallet Management (wallet.html)</h2>
+
+        <h3>Database Integration</h3>
+        <div class="example">
+// Add wallet
+const wallet = await API.wallet.create({
+    user_id: userId,
+    address: '0x742d35Cc6634C0532925a3b844Bc9e7595f42bE',
+    chain: 'ethereum',
+    is_primary: true
+});
+
+// Get all user wallets
+const wallets = await API.wallet.getByUserId(userId);
+
+// Get wallet by address
+const wallet = await API.wallet.getByAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f42bE');
+        </div>
+
+        <h2>8. Admin Dashboard (admin/dashboard.html)</h2>
+
+        <h3>User Management</h3>
+        <div class="example">
+// Get all users (paginated)
+const users = await API.users.getAll(50, 0); // 50 per page, page 0
+
+// Update user balance (admin)
+await API.users.updateBalance('user123', 5000);
+
+// Create notification for user
+await API.notification.create({
+    user_id: 'user123',
+    title: 'Balance Adjustment',
+    message: 'Your balance has been updated',
+    type: 'info'
+});
+        </div>
+
+        <h3>Transaction Management</h3>
+        <div class="example">
+// Get topup records
+const topups = await API.topup.getRecords(userId);
+
+// Approve topup
+await API.topup.updateStatus(topupId, 'complete');
+
+// Get withdrawal requests
+const withdrawals = await API.withdrawal.getRecords(userId);
+
+// Process withdrawal
+await API.withdrawal.updateStatus(withdrawalId, 'complete', 'txhash_here');
+        </div>
+
+        <h2>9. Notifications System</h2>
+
+        <h3>Sending Notifications</h3>
+        <div class="example">
+// Send notification when topup is approved
+await API.notification.create({
+    user_id: userId,
+    title: 'Topup Approved',
+    message: `Your ${amount} ${coin} deposit has been approved`,
+    type: 'success'
+});
+
+// Send notification on trade close
+await API.notification.create({
+    user_id: userId,
+    title: 'Trade Closed',
+    message: `Trade ${pair} closed with ${pnl > 0 ? '+' : ''}${pnl} profit`,
+    type: pnl > 0 ? 'success' : 'warning'
+});
+
+// Send mining reward notification
+await API.notification.create({
+    user_id: userId,
+    title: 'Mining Reward',
+    message: `You earned ${dailyReward} from mining`,
+    type: 'success'
+});
+        </div>
+
+        <h3>Getting Notifications</h3>
+        <div class="example">
+// Get user notifications
+const notifications = await API.notification.get(userId);
+
+// Mark as read
+await API.notification.markAsRead(notificationId);
+
+// Display unread count
+const unread = notifications.filter(n => !n.read).length;
+document.getElementById('notifBadge').textContent = unread;
+        </div>
+
+        <h2>10. Error Handling</h2>
+
+        <div class="example">
+// Proper error handling
+try {
+    const result = await API.topup.create({
+        user_id: userId,
+        coin: 'BTC',
+        address: walletAddress,
+        amount: topupAmount,
+        photo_url: proofUrl
+    });
+    
+    console.log('Topup created:', result);
+    
+    // Show success message
+    showNotification('Topup submitted successfully!', 'success');
+    
+} catch (error) {
+    console.error('Topup failed:', error);
+    
+    // Show error message
+    showNotification('Error: ' + error.message, 'error');
+    
+    // Could retry or take other action
+    if (error.message.includes('network')) {
+        // Retry logic
+    }
+}
+        </div>
+
+        <h2>11. Common Patterns</h2>
+
+        <h3>Auto-refresh Data</h3>
+        <div class="example">
+// Refresh data every 10 seconds
+setInterval(async () => {
+    const user = await API.users.getById(userId);
+    document.getElementById('balance').textContent = user.balance;
+    
+    const topups = await API.topup.getRecords(userId);
+    updateTopupList(topups);
+}, 10000);
+        </div>
+
+        <h3>Load More (Pagination)</h3>
+        <div class="example">
+let currentPage = 0;
+const pageSize = 20;
+
+async function loadMore() {
+    const users = await API.users.getAll(pageSize, currentPage * pageSize);
+    displayUsers(users);
+    currentPage++;
+}
+
+// Load initial data
+loadMore();
+
+// Load more button
+document.getElementById('loadMoreBtn').addEventListener('click', loadMore);
+        </div>
+
+        <h3>Real-Time Updates with WebSocket</h3>
+        <div class="example">
+// Fallback: Polling (REST API)
+setInterval(async () => {
+    const user = await API.users.getById(userId);
+    if (user.balance !== lastBalance) {
+        lastBalance = user.balance;
+        displayBalance(user.balance);
+    }
+}, 2000);
+
+// Future: WebSocket for real-time
+// const ws = new WebSocket('wss://localhost:3000/ws');
+// ws.onmessage = (event) => {
+//     const data = JSON.parse(event.data);
+//     handleUpdate(data);
+// };
+        </div>
+
+        <h2>12. Migration Checklist</h2>
+
+        <div class="success">
+            ✅ Include &lt;script src="/js/api-client.js"&gt;&lt;/script&gt; in HTML<br>
+            ✅ Replace fetch() calls with API.* functions<br>
+            ✅ Remove references to JSON files<br>
+            ✅ Add error handling with try/catch<br>
+            ✅ Update form submissions to use API<br>
+            ✅ Replace data display logic<br>
+            ✅ Test all functionality<br>
+            ✅ Check browser console for errors
+        </div>
+
+        <h2>13. Quick Reference</h2>
+
+        <div class="example">
+// Users
+API.users.getById(id)
+API.users.getAll(limit, skip)
+API.users.updateBalance(id, balance)
+API.users.updateBalances(id, balances)
+
+// Transactions
+API.topup.create/getRecords/updateStatus
+API.withdrawal.create/getRecords/updateStatus
+API.exchange.create/getRecords
+API.trade.create/getRecords/close
+
+// Services
+API.mining.create/getRecords/claimRewards
+API.loan.create/getRecords
+API.wallet.create/getByUserId/getByAddress
+API.kyc.submit/getStatus/verify
+API.arbitrage.getProducts/subscribe/getSubscriptions
+
+// Other
+API.notification.create/get/markAsRead
+        </div>
+
+        <div class="warning">
+            ⚠️ Important Notes:<br>
+            • Always include /js/api-client.js before using API<br>
+            • All API calls are async - use await<br>
+            • Use try/catch for error handling<br>
+            • Server must be running: node app-server.js<br>
+            • MongoDB must be connected
+        </div>
+
+        <h2>Need Help?</h2>
+        <p>
+            Visit the interactive testing page: <a href="/database-integration.html">database-integration.html</a><br>
+            Check the full guide: <a href="/DATABASE_SETUP.md">DATABASE_SETUP.md</a>
+        </p>
+    </div>
+</body>
+</html>
