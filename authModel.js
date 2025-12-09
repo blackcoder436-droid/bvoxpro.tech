@@ -1,10 +1,34 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 // Data file path - prefer local `admins.json` in the repo root
 const adminsFile = path.join(__dirname, 'admins.json');
 const legacyAdminsFile = path.join(__dirname, '..', 'admins.json');
+
+// MongoDB support (optional - will gracefully fall back to JSON)
+let AdminModel = null;
+let UserModel = null;
+
+try {
+    // Try to load models if MongoDB is connected
+    if (mongoose.connection.readyState === 1) {
+        // Connected
+        AdminModel = require('./models/Admin');
+        UserModel = require('./models/User');
+        console.log('[authModel] MongoDB connection detected; using DB-backed operations');
+    }
+} catch (e) {
+    console.log('[authModel] MongoDB models not available; will use JSON fallback');
+}
+
+/**
+ * Check if MongoDB is available (connected)
+ */
+function isDbAvailable() {
+    return mongoose.connection && mongoose.connection.readyState === 1;
+}
 
 /**
  * Hash password
@@ -55,9 +79,21 @@ function verifyToken(token) {
 }
 
 /**
- * Get all admins
+ * Get all admins (DB-first, JSON fallback)
  */
-function getAllAdmins() {
+async function getAllAdmins() {
+    // Try DB first
+    if (isDbAvailable() && AdminModel) {
+        try {
+            const admins = await AdminModel.find({});
+            console.log('[authModel] getAllAdmins from MongoDB returned', admins.length, 'admins');
+            return admins;
+        } catch (e) {
+            console.warn('[authModel] getAllAdmins DB query failed; falling back to JSON:', e.message);
+        }
+    }
+
+    // JSON fallback
     try {
         let fileToRead = null;
 
@@ -127,26 +163,54 @@ function generateNextAdminId() {
 }
 
 /**
- * Get admin by username
+ * Get admin by username (DB-first, JSON fallback)
  */
-function getAdminByUsername(username) {
-    const admins = getAllAdmins();
+async function getAdminByUsername(username) {
+    // Try DB first
+    if (isDbAvailable() && AdminModel) {
+        try {
+            const admin = await AdminModel.findOne({ username });
+            if (admin) {
+                console.log('[authModel] getAdminByUsername from MongoDB:', username);
+                return admin;
+            }
+        } catch (e) {
+            console.warn('[authModel] getAdminByUsername DB query failed; falling back to JSON:', e.message);
+        }
+    }
+
+    // JSON fallback
+    const admins = await getAllAdmins();
     return admins.find(a => a.username === username);
 }
 
 /**
- * Get admin by ID
+ * Get admin by ID (DB-first, JSON fallback)
  */
-function getAdminById(adminId) {
-    const admins = getAllAdmins();
+async function getAdminById(adminId) {
+    // Try DB first
+    if (isDbAvailable() && AdminModel) {
+        try {
+            const admin = await AdminModel.findOne({ id: adminId });
+            if (admin) {
+                console.log('[authModel] getAdminById from MongoDB:', adminId);
+                return admin;
+            }
+        } catch (e) {
+            console.warn('[authModel] getAdminById DB query failed; falling back to JSON:', e.message);
+        }
+    }
+
+    // JSON fallback
+    const admins = await getAllAdmins();
     return admins.find(a => a.id === adminId);
 }
 
 /**
- * Register new admin
+ * Register new admin (DB-first, JSON fallback)
  */
-function registerAdmin(fullname, username, email, password) {
-    const admins = getAllAdmins();
+async function registerAdmin(fullname, username, email, password) {
+    const admins = await getAllAdmins();
 
     // Check if username already exists
     if (admins.find(a => a.username === username)) {
@@ -169,17 +233,28 @@ function registerAdmin(fullname, username, email, password) {
         lastLogin: null
     };
 
+    // Try to save to DB if available
+    if (isDbAvailable() && AdminModel) {
+        try {
+            const dbAdmin = await AdminModel.create(admin);
+            console.log('[authModel] registerAdmin saved to MongoDB:', admin.id);
+            return dbAdmin;
+        } catch (e) {
+            console.warn('[authModel] registerAdmin DB save failed; falling back to JSON:', e.message);
+        }
+    }
+
+    // JSON fallback
     admins.push(admin);
     fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
-
     return admin;
 }
 
 /**
- * Login admin
+ * Login admin (DB-first, JSON fallback)
  */
-function loginAdmin(username, password) {
-    const admin = getAdminByUsername(username);
+async function loginAdmin(username, password) {
+    const admin = await getAdminByUsername(username);
 
     if (!admin) {
         throw new Error('Invalid username or password');
@@ -195,10 +270,30 @@ function loginAdmin(username, password) {
     }
 
     // Update last login
-    const admins = getAllAdmins();
-    const adminIndex = admins.findIndex(a => a.id === admin.id);
-    admins[adminIndex].lastLogin = new Date().toISOString();
-    fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
+    // Try DB first
+    if (isDbAvailable() && AdminModel) {
+        try {
+            await AdminModel.updateOne({ id: admin.id }, { lastLogin: new Date().toISOString() });
+            console.log('[authModel] loginAdmin updated lastLogin in MongoDB:', admin.id);
+        } catch (e) {
+            console.warn('[authModel] loginAdmin DB update failed; falling back to JSON:', e.message);
+            // Fall through to JSON update
+            const admins = await getAllAdmins();
+            const adminIndex = admins.findIndex(a => a.id === admin.id);
+            if (adminIndex !== -1) {
+                admins[adminIndex].lastLogin = new Date().toISOString();
+                fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
+            }
+        }
+    } else {
+        // JSON fallback
+        const admins = await getAllAdmins();
+        const adminIndex = admins.findIndex(a => a.id === admin.id);
+        if (adminIndex !== -1) {
+            admins[adminIndex].lastLogin = new Date().toISOString();
+            fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
+        }
+    }
 
     // Generate token
     const token = generateToken(admin.id);
@@ -212,10 +307,10 @@ function loginAdmin(username, password) {
 }
 
 /**
- * Change password
+ * Change password (DB-first, JSON fallback)
  */
-function changePassword(adminId, oldPassword, newPassword) {
-    const admin = getAdminById(adminId);
+async function changePassword(adminId, oldPassword, newPassword) {
+    const admin = await getAdminById(adminId);
 
     if (!admin) {
         throw new Error('Admin not found');
@@ -226,11 +321,30 @@ function changePassword(adminId, oldPassword, newPassword) {
         throw new Error('Old password is incorrect');
     }
 
-    const admins = getAllAdmins();
-    const adminIndex = admins.findIndex(a => a.id === adminId);
-    admins[adminIndex].password = hashPassword(newPassword);
-    fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
+    const newHashedPassword = hashPassword(newPassword);
 
+    // Try DB first
+    if (isDbAvailable() && AdminModel) {
+        try {
+            const updatedAdmin = await AdminModel.findOneAndUpdate(
+                { id: adminId },
+                { password: newHashedPassword },
+                { new: true }
+            );
+            console.log('[authModel] changePassword updated in MongoDB:', adminId);
+            return updatedAdmin;
+        } catch (e) {
+            console.warn('[authModel] changePassword DB update failed; falling back to JSON:', e.message);
+        }
+    }
+
+    // JSON fallback
+    const admins = await getAllAdmins();
+    const adminIndex = admins.findIndex(a => a.id === adminId);
+    if (adminIndex === -1) throw new Error('Admin not found');
+    
+    admins[adminIndex].password = newHashedPassword;
+    fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
     return admins[adminIndex];
 }
 
@@ -243,26 +357,57 @@ module.exports = {
     changePassword,
     generateToken,
     verifyToken,
-    // Update admin profile fields (safe merge)
-    updateAdminProfile: function(adminId, updates) {
-        const fileToRead = fs.existsSync(adminsFile) ? adminsFile : (fs.existsSync(legacyAdminsFile) ? legacyAdminsFile : null);
-        if (!fileToRead) throw new Error('Admins file not found');
-        const data = fs.readFileSync(fileToRead, 'utf8') || '[]';
-        const admins = JSON.parse(data);
-        const idx = admins.findIndex(a => a.id === adminId);
-        if (idx === -1) throw new Error('Admin not found');
-
-        // Only allow certain fields to be updated
-        const allowed = ['fullname','email','telegram','wallets'];
-        for (const key of Object.keys(updates || {})) {
-            if (allowed.includes(key)) {
-                admins[idx][key] = updates[key];
+    isDbAvailable,
+    // Update admin profile fields (safe merge) - DB-first, JSON fallback
+    updateAdminProfile: async function(adminId, updates) {
+        try {
+            // Try DB first
+            if (isDbAvailable() && AdminModel) {
+                try {
+                    // Only allow certain fields to be updated
+                    const allowed = ['fullname', 'email', 'telegram', 'wallets'];
+                    const safeUpdates = {};
+                    for (const key of Object.keys(updates || {})) {
+                        if (allowed.includes(key)) {
+                            safeUpdates[key] = updates[key];
+                        }
+                    }
+                    
+                    const updatedAdmin = await AdminModel.findOneAndUpdate(
+                        { id: adminId },
+                        { $set: safeUpdates },
+                        { new: true }
+                    );
+                    console.log('[authModel] updateAdminProfile saved to MongoDB:', adminId);
+                    return updatedAdmin;
+                } catch (e) {
+                    console.warn('[authModel] updateAdminProfile DB save failed; falling back to JSON:', e.message);
+                }
             }
-        }
 
-        // Persist
-        fs.writeFileSync(fileToRead, JSON.stringify(admins, null, 2));
-        return admins[idx];
+            // JSON fallback
+            const fileToRead = fs.existsSync(adminsFile) ? adminsFile : (fs.existsSync(legacyAdminsFile) ? legacyAdminsFile : null);
+            if (!fileToRead) throw new Error('Admins file not found');
+            const data = fs.readFileSync(fileToRead, 'utf8') || '[]';
+            const admins = JSON.parse(data);
+            const idx = admins.findIndex(a => a.id === adminId);
+            if (idx === -1) throw new Error('Admin not found');
+
+            // Only allow certain fields to be updated
+            const allowed = ['fullname', 'email', 'telegram', 'wallets'];
+            for (const key of Object.keys(updates || {})) {
+                if (allowed.includes(key)) {
+                    admins[idx][key] = updates[key];
+                }
+            }
+
+            // Persist
+            fs.writeFileSync(fileToRead, JSON.stringify(admins, null, 2));
+            return admins[idx];
+        } catch (e) {
+            console.error('[authModel] updateAdminProfile error:', e.message);
+            throw e;
+        }
     },
     hashPassword
 };

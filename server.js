@@ -9,6 +9,10 @@
  */
 
 const http = require('http');
+// Load environment variables early
+try { require('dotenv').config(); } catch(e) { /* ignore */ }
+// Connect to MongoDB (optional - will skip if MONGODB_URI not provided)
+try { const { connectDB } = require('./config/db'); connectDB(); } catch(e) { /* ignore */ }
 const { registerUser } = require('./userModel');
 const { saveTopupRecord, getUserTopupRecords } = require('./topupRecordModel');
 const { saveWithdrawalRecord, getUserWithdrawalRecords } = require('./withdrawalRecordModel');
@@ -1872,31 +1876,33 @@ const server = http.createServer((req, res) => {
     }
     // Public admin info (telegram + wallets) - GET /api/public/admin-info
     if (pathname === '/api/public/admin-info' && req.method === 'GET') {
-        try {
-            const admins = getAllAdmins();
-            if (!admins || admins.length === 0) {
+        (async () => {
+            try {
+                const admins = await getAllAdmins();
+                if (!admins || admins.length === 0) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, telegram: '', wallets: {} }));
+                    return;
+                }
+
+                // Prefer an admin that has public info (telegram or wallets). If none, prefer an active admin, otherwise first.
+                let admin = admins.find(a => a && ( (a.telegram && String(a.telegram).trim() !== '') || (a.wallets && typeof a.wallets === 'object' && Object.values(a.wallets).some(v => v && String(v).trim() !== '')) ))
+                            || admins.find(a => a && a.status === 'active')
+                            || admins[0];
+
+                const publicInfo = {
+                    telegram: (admin && admin.telegram) ? String(admin.telegram) : '',
+                    wallets: (admin && admin.wallets && typeof admin.wallets === 'object') ? admin.wallets : {}
+                };
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, telegram: '', wallets: {} }));
-                return;
+                res.end(JSON.stringify({ success: true, ...publicInfo }));
+            } catch (e) {
+                console.error('[public-admin-info] Error:', e && e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Failed to load admin info' }));
             }
-
-            // Prefer an admin that has public info (telegram or wallets). If none, prefer an active admin, otherwise first.
-            let admin = admins.find(a => a && ( (a.telegram && String(a.telegram).trim() !== '') || (a.wallets && typeof a.wallets === 'object' && Object.values(a.wallets).some(v => v && String(v).trim() !== '')) ))
-                        || admins.find(a => a && a.status === 'active')
-                        || admins[0];
-
-            const publicInfo = {
-                telegram: (admin && admin.telegram) ? String(admin.telegram) : '',
-                wallets: (admin && admin.wallets && typeof admin.wallets === 'object') ? admin.wallets : {}
-            };
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, ...publicInfo }));
-        } catch (e) {
-            console.error('[public-admin-info] Error:', e && e.message);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Failed to load admin info' }));
-        }
+        })();
         return;
     }
     
