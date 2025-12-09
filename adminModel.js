@@ -7,10 +7,35 @@ const topupFile = path.join(__dirname, 'topup_records.json');
 const withdrawalFile = path.join(__dirname, 'withdrawals_records.json');
 const exchangeFile = path.join(__dirname, 'exchange_records.json');
 
+// MongoDB support
+let mongoose;
+let User;
+try {
+    mongoose = require('mongoose');
+    User = require('./models/User');
+} catch (e) {
+    mongoose = null;
+    User = null;
+}
+
 /**
  * Get all users
  */
-function getAllUsers() {
+async function getAllUsers() {
+    // Try MongoDB first if available
+    if (mongoose && User && mongoose.connection.readyState === 1) {
+        try {
+            const users = await User.find({});
+            if (users && users.length > 0) {
+                console.log(`[getAllUsers] Found ${users.length} users in MongoDB`);
+                return users;
+            }
+        } catch (dbErr) {
+            console.error('[getAllUsers] DB error, falling back to JSON:', dbErr.message);
+        }
+    }
+    
+    // Fallback to JSON
     try {
         if (!fs.existsSync(usersFile)) {
             return [];
@@ -26,39 +51,103 @@ function getAllUsers() {
 /**
  * Get user by ID (supports both userid and uid fields)
  */
-function getUserById(userId) {
-    const users = getAllUsers();
-    // Try to find by userid or uid field
-    return users.find(u => String(u.userid) === String(userId) || String(u.uid) === String(userId));
+async function getUserById(userId) {
+    // Try MongoDB first if available
+    if (mongoose && User && mongoose.connection.readyState === 1) {
+        try {
+            const user = await User.findOne({
+                $or: [
+                    { userid: String(userId) },
+                    { uid: String(userId) },
+                    { id: String(userId) }
+                ]
+            });
+            if (user) {
+                console.log(`[getUserById] Found in MongoDB: ${userId}`);
+                return user;
+            }
+        } catch (dbErr) {
+            console.error('[getUserById] DB error, falling back to JSON:', dbErr.message);
+        }
+    }
+    
+    // Fallback to JSON
+    try {
+        if (!fs.existsSync(usersFile)) {
+            return null;
+        }
+        const data = fs.readFileSync(usersFile, 'utf8');
+        const users = JSON.parse(data);
+        return users.find(u => String(u.userid) === String(userId) || String(u.uid) === String(userId));
+    } catch (e) {
+        console.error('[getUserById] JSON fallback error:', e);
+        return null;
+    }
 }
 
 /**
  * Update user balance
  */
-function updateUserBalance(userId, coin, amount) {
-    const users = getAllUsers();
-    const user = users.find(u => u.userid === userId);
+async function updateUserBalance(userId, coin, amount) {
+    // Try MongoDB first if available
+    if (mongoose && User && mongoose.connection.readyState === 1) {
+        try {
+            const user = await User.findOneAndUpdate(
+                {
+                    $or: [
+                        { userid: String(userId) },
+                        { uid: String(userId) },
+                        { id: String(userId) }
+                    ]
+                },
+                {
+                    $set: {
+                        [`balances.${coin.toLowerCase()}`]: parseFloat(amount)
+                    }
+                },
+                { new: true }
+            );
+            if (user) {
+                console.log(`[updateUserBalance] Updated in MongoDB: ${userId}`);
+                return user;
+            }
+        } catch (dbErr) {
+            console.error('[updateUserBalance] DB error, falling back to JSON:', dbErr.message);
+        }
+    }
     
-    if (!user) {
+    // Fallback to JSON
+    try {
+        if (!fs.existsSync(usersFile)) {
+            return null;
+        }
+        const data = fs.readFileSync(usersFile, 'utf8');
+        const users = JSON.parse(data);
+        const user = users.find(u => u.userid === userId);
+        
+        if (!user) {
+            return null;
+        }
+
+        if (!user.balances) {
+            user.balances = {};
+        }
+
+        const coins = ['usdt', 'btc', 'eth', 'usdc', 'pyusd', 'sol'];
+        coins.forEach(c => {
+            if (!user.balances[c]) {
+                user.balances[c] = 0;
+            }
+        });
+
+        user.balances[coin.toLowerCase()] = parseFloat(amount);
+
+        fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+        return user;
+    } catch (e) {
+        console.error('[updateUserBalance] JSON fallback error:', e);
         return null;
     }
-
-    if (!user.balances) {
-        user.balances = {};
-    }
-
-    const coins = ['usdt', 'btc', 'eth', 'usdc', 'pyusd', 'sol'];
-    coins.forEach(c => {
-        if (!user.balances[c]) {
-            user.balances[c] = 0;
-        }
-    });
-
-    const currentBalance = parseFloat(user.balances[coin.toLowerCase()]) || 0;
-    user.balances[coin.toLowerCase()] = parseFloat(amount);
-
-    fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
-    return user;
 }
 
 /**

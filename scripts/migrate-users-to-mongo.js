@@ -14,13 +14,16 @@ mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
     process.exit(1);
   });
 
-// User schema
+// User schema - match the actual model
 const userSchema = new mongoose.Schema({
   id: { type: String, index: true },
+  userid: { type: String, index: true },
+  uid: { type: String },
   username: { type: String },
   email: { type: String },
   password: { type: String },
   balance: { type: Number, default: 0 },
+  balances: { type: Object, default: {} },
   role: { type: String, default: 'user' },
   meta: { type: Object, default: {} }
 }, { timestamps: true });
@@ -41,12 +44,12 @@ async function migrateUsers() {
     let count = 0;
     for (const user of usersData) {
       await User.updateOne(
-        { id: user.id },
+        { userid: user.userid },
         { $set: user },
         { upsert: true }
       );
       count++;
-      console.log(`✓ Migrated user: ${user.id} (${user.username || 'unknown'})`);
+      console.log(`✓ Migrated user: ${user.userid} (${user.username || 'unknown'})`);
     }
 
     console.log(`\n✅ Migration complete: ${count} users imported`);

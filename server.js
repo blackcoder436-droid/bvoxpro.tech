@@ -1008,45 +1008,48 @@ const server = http.createServer((req, res) => {
     
     // Get wallet balance (GET) - accept ?userid= for browser/direct requests
     if ((pathname === '/api/Wallet/getbalance' || pathname === '/api/wallet/getbalance') && req.method === 'GET') {
-        try {
-            const queryParams = url.parse(req.url, true).query;
-            const userid = queryParams.userid || queryParams.user_id;
+        (async () => {
+            try {
+                const queryParams = url.parse(req.url, true).query;
+                const userid = queryParams.userid || queryParams.user_id;
 
-            if (!userid) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ code: 0, error: 'Missing userid parameter', success: false }));
-                return;
-            }
-
-            const user = getUserById(userid);
-            if (!user) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ code: 0, error: 'User not found', success: false }));
-                return;
-            }
-
-            // Return balance data from user.balances object (or fallback to direct properties)
-            const balances = user.balances || {};
-            const balanceData = {
-                code: 1,
-                success: true,
-                data: {
-                    usdt: balances.usdt || user.usdt || 0,
-                    btc: balances.btc || user.btc || 0,
-                    eth: balances.eth || user.eth || 0,
-                    usdc: balances.usdc || user.usdc || 0,
-                    pyusd: balances.pyusd || user.pyusd || 0,
-                    sol: balances.sol || user.sol || 0
+                if (!userid) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ code: 0, error: 'Missing userid parameter', success: false }));
+                    return;
                 }
-            };
 
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(balanceData));
-        } catch (e) {
-            console.error('[wallet-getbalance-GET] Error:', e.message);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ code: 0, error: e.message, success: false }));
-        }
+                const user = await getUserById(userid);
+                console.log(`[wallet-getbalance-GET] userId=${userid}, source=${user && user._id ? 'MongoDB' : 'JSON'}`);
+                if (!user) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ code: 0, error: 'User not found', success: false }));
+                    return;
+                }
+
+                // Return balance data from user.balances object (or fallback to direct properties)
+                const balances = user.balances || {};
+                const balanceData = {
+                    code: 1,
+                    success: true,
+                    data: {
+                        usdt: balances.usdt || user.usdt || 0,
+                        btc: balances.btc || user.btc || 0,
+                        eth: balances.eth || user.eth || 0,
+                        usdc: balances.usdc || user.usdc || 0,
+                        pyusd: balances.pyusd || user.pyusd || 0,
+                        sol: balances.sol || user.sol || 0
+                    }
+                };
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(balanceData));
+            } catch (e) {
+                console.error('[wallet-getbalance-GET] Error:', e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ code: 0, error: e.message, success: false }));
+            }
+        })();
         return;
     }
 
@@ -1054,7 +1057,7 @@ const server = http.createServer((req, res) => {
     if ((pathname === '/api/Wallet/getbalance' || pathname === '/api/wallet/getbalance') && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 let jsonBody = body;
                 if (body.includes('}&')) {
@@ -1084,8 +1087,9 @@ const server = http.createServer((req, res) => {
                     return;
                 }
                 
-                // Get user from database
-                const user = getUserById(userid);
+                // Get user from database (now async with MongoDB support)
+                const user = await getUserById(userid);
+                console.log(`[wallet-getbalance] userId=${userid}, source=${user && user._id ? 'MongoDB' : 'JSON'}`);
                 
                 if (!user) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -1679,7 +1683,7 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/admin/login' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 let jsonBody = body;
                 if (body.includes('}&')) {
@@ -1695,7 +1699,7 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                const result = loginAdmin(username, password);
+                const result = await loginAdmin(username, password);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, ...result }));
             } catch (e) {
@@ -1908,34 +1912,38 @@ const server = http.createServer((req, res) => {
     
     // Get all users (admin)
     if (pathname === '/api/admin/users' && req.method === 'GET') {
-        const users = getAllUsers();
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, users }));
+        (async () => {
+            const users = await getAllUsers();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, users }));
+        })();
         return;
     }
 
     // Get user details and stats (admin)
     if (pathname === '/api/admin/user-stats' && req.method === 'GET') {
-        const queryParams = url.parse(req.url, true).query;
-        const userId = queryParams.user_id;
-        
-        if (!userId) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Missing user_id parameter' }));
-            return;
-        }
+        (async () => {
+            const queryParams = url.parse(req.url, true).query;
+            const userId = queryParams.user_id;
+            
+            if (!userId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing user_id parameter' }));
+                return;
+            }
 
-        const user = getUserById(userId);
-        const stats = getUserStats(userId);
+            const user = await getUserById(userId);
+            const stats = getUserStats(userId);
 
-        if (!user) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'User not found' }));
-            return;
-        }
+            if (!user) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'User not found' }));
+                return;
+            }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, user, stats }));
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, user, stats }));
+        })();
         return;
     }
 
@@ -1943,7 +1951,7 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/admin/update-balance' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 let jsonBody = body;
                 if (body.includes('}&')) {
@@ -1959,7 +1967,7 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                const updatedUser = updateUserBalance(user_id, coin, amount);
+                const updatedUser = await updateUserBalance(user_id, coin, amount);
 
                 if (!updatedUser) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -4167,6 +4175,11 @@ const server = http.createServer((req, res) => {
 
     // Build file path
     let filePath = path.join(__dirname, pathname);
+    
+    // If requesting root path, default to index.html
+    if (pathname === '/' || pathname === '') {
+        filePath = path.join(__dirname, 'index.html');
+    }
 
     // Resolve potential directory traversal attacks
     filePath = path.normalize(filePath);
