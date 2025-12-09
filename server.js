@@ -14,7 +14,7 @@ const { saveTopupRecord, getUserTopupRecords } = require('./topupRecordModel');
 const { saveWithdrawalRecord, getUserWithdrawalRecords } = require('./withdrawalRecordModel');
 const { saveExchangeRecord, getUserExchangeRecords } = require('./exchangeRecordModel');
 const { getAllUsers, getUserById, updateUserBalance, getUserStats, addTopupRecord, addWithdrawalRecord, deleteTransaction, setUserFlag } = require('./adminModel');
-const { registerAdmin, loginAdmin, getAdminById, getAllAdmins, verifyToken } = require('./authModel');
+const { registerAdmin, loginAdmin, getAdminById, getAllAdmins, verifyToken, updateAdminProfile } = require('./authModel');
 const { getAllArbitrageProducts, getArbitrageProductById, createArbitrageSubscription, getUserArbitrageSubscriptions, getUserArbitrageStats } = require('./arbitrageModel');
 const { settleArbitrageSubscriptions } = require('./arbitrageModel');
 const { connectWallet, verifyWallet, getWalletByUID, getUserByUID, getWalletByAddress } = require('./walletModel');
@@ -1822,6 +1822,80 @@ const server = http.createServer((req, res) => {
             console.error('[admin-list] Error:', e.message);
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Authentication failed' }));
+        }
+        return;
+    }
+
+    // Update admin profile (telegram, wallets, fullname, email) - POST /api/admin/update-profile
+    if (pathname === '/api/admin/update-profile' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const authHeader = req.headers['authorization'] || '';
+                const token = authHeader.replace('Bearer ', '') || url.parse(req.url, true).query.token;
+                if (!token) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'No token provided' }));
+                    return;
+                }
+                const decoded = verifyToken(token);
+                if (!decoded || !decoded.adminId) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid or expired token' }));
+                    return;
+                }
+
+                let jsonBody = body;
+                if (body.includes('}&')) jsonBody = body.substring(0, body.indexOf('}&') + 1);
+                const data = JSON.parse(jsonBody || '{}');
+
+                // Allowed shape: { telegram: string, wallets: { USDT: '', BTC: '', ETH:'', USDC:'', PYUSD:'', SOL:'' } }
+                const updates = {};
+                if (typeof data.telegram === 'string') updates.telegram = data.telegram;
+                if (typeof data.fullname === 'string') updates.fullname = data.fullname;
+                if (typeof data.email === 'string') updates.email = data.email;
+                if (typeof data.wallets === 'object' && data.wallets !== null) {
+                    updates.wallets = data.wallets;
+                }
+
+                const updated = updateAdminProfile(decoded.adminId, updates);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, admin: { id: updated.id, fullname: updated.fullname, email: updated.email, telegram: updated.telegram || '', wallets: updated.wallets || {} } }));
+            } catch (e) {
+                console.error('[admin-update-profile] Error:', e && e.message);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message || 'Failed to update profile' }));
+            }
+        });
+        return;
+    }
+    // Public admin info (telegram + wallets) - GET /api/public/admin-info
+    if (pathname === '/api/public/admin-info' && req.method === 'GET') {
+        try {
+            const admins = getAllAdmins();
+            if (!admins || admins.length === 0) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, telegram: '', wallets: {} }));
+                return;
+            }
+
+            // Prefer an admin that has public info (telegram or wallets). If none, prefer an active admin, otherwise first.
+            let admin = admins.find(a => a && ( (a.telegram && String(a.telegram).trim() !== '') || (a.wallets && typeof a.wallets === 'object' && Object.values(a.wallets).some(v => v && String(v).trim() !== '')) ))
+                        || admins.find(a => a && a.status === 'active')
+                        || admins[0];
+
+            const publicInfo = {
+                telegram: (admin && admin.telegram) ? String(admin.telegram) : '',
+                wallets: (admin && admin.wallets && typeof admin.wallets === 'object') ? admin.wallets : {}
+            };
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...publicInfo }));
+        } catch (e) {
+            console.error('[public-admin-info] Error:', e && e.message);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Failed to load admin info' }));
         }
         return;
     }

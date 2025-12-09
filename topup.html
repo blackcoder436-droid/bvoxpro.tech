@@ -224,7 +224,21 @@
 
             $(document).ready(function() {
                 console.log('?? Page loaded, initializing QR and address...');
-                updateQRAndAddress();
+                // Fetch admin-provided wallets and merge into addrMap so updated addresses show to users
+                fetch('/api/public/admin-info').then(r=>r.json()).then(pub=>{
+                    if(pub && pub.success && pub.wallets && typeof pub.wallets === 'object'){
+                        try{
+                            const w = pub.wallets;
+                            // map admin wallet keys to lowercase keys used in this page
+                            if(w.USDT) addrMap.usdt = String(w.USDT);
+                            if(w.BTC) addrMap.btc = String(w.BTC);
+                            if(w.ETH) addrMap.eth = String(w.ETH);
+                            if(w.USDC) addrMap.usdc = String(w.USDC);
+                            if(w.PYUSD) addrMap.pyusd = String(w.PYUSD);
+                            if(w.SOL) addrMap.sol = String(w.SOL);
+                        }catch(e){ console.warn('Failed to apply admin wallets', e); }
+                    }
+                }).catch(e=>{ console.warn('Could not fetch public admin info', e); }).finally(()=>{ updateQRAndAddress(); });
                 
                 // Copy address to clipboard
                 $(document).on('click', '.y-copydz', function() {

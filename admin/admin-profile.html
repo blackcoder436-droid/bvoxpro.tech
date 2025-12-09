@@ -12,17 +12,26 @@
     .label{color:#8b949e;width:140px}
     .value{color:#cfe3ff}
     .back{display:inline-block;margin-top:18px;padding:8px 12px;border-radius:6px;background:#1f6feb;color:#fff;text-decoration:none}
+    .top-controls .back{margin-top:0}
+    .top-controls a.back, .top-controls button{display:inline-flex;align-items:center;height:36px}
+    .top-controls #topSaveBtn{padding:8px 12px;border-radius:6px;background:#198754;color:#fff;border:none;cursor:pointer}
     .muted{color:#8b949e;font-size:13px}
     pre{background:#07121a;padding:12px;border-radius:6px;overflow:auto}
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Admin Profile</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h1 id="pageTitle" style="margin:0">Admin Profile</h1>
+      <div class="top-controls" style="display:flex;align-items:center;gap:8px">
+        <a href="dashboard.html" class="back" id="topBack">← Back to Dashboard</a>
+        <button id="topSaveBtn">Update Profile</button>
+      </div>
+    </div>
     <div id="content">
       <p class="muted">Loading admin profile…</p>
     </div>
-    <a href="dashboard.html" class="back">← Back to Dashboard</a>
+    <!-- Back and Update controls moved to top-right -->
   </div>
 
   <script>
@@ -44,19 +53,79 @@
           return;
         }
         const admin = data.admin;
-        const last = admin.lastLogin || 'Never';
+        // Show Admin ID in the top header as requested
+        const titleEl = document.getElementById('pageTitle');
+        if (titleEl) titleEl.textContent = `Admin Profile: ${admin.id}`;
+
+        // Build editable profile form (telegram + wallets)
+        const wallets = (admin.wallets && typeof admin.wallets === 'object') ? admin.wallets : {};
         const html = `
-          <div class="row"><div class="label">Full name</div><div class="value">${admin.fullname||'-'}</div></div>
-          <div class="row" style="margin-top:8px"><div class="label">Username</div><div class="value">${admin.username||'-'}</div></div>
-          <div class="row" style="margin-top:8px"><div class="label">Email</div><div class="value">${admin.email||'-'}</div></div>
-          <div class="row" style="margin-top:8px"><div class="label">Status</div><div class="value">${admin.status||'-'}</div></div>
-          <div class="row" style="margin-top:8px"><div class="label">Created</div><div class="value">${admin.created_at||'-'}</div></div>
-          <div class="row" style="margin-top:8px"><div class="label">Last login</div><div class="value">${last}</div></div>
-          <hr style="margin:16px 0;border:none;border-top:1px solid #22272b">
-          <div class="muted">Admin ID:</div>
-          <pre>${admin.id}</pre>
+          <form id="profileForm">
+            <div class="row"><div class="label">Full name</div><div class="value"><input id="fullname" name="fullname" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${admin.fullname||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">Username</div><div class="value">${admin.username||'-'}</div></div>
+            <div class="row" style="margin-top:8px"><div class="label">Email</div><div class="value"><input id="email" name="email" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${admin.email||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">Telegram Username</div><div class="value"><input id="telegram" name="telegram" placeholder="e.g. BVOXTech_Support" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${admin.telegram||''}"></div></div>
+
+            <hr style="margin:16px 0;border:none;border-top:1px solid #22272b">
+            <div style="margin-bottom:8px;color:#9fb4d9;font-weight:600">Your Wallet Addresses</div>
+
+            <div class="row" style="margin-top:8px"><div class="label">USDT</div><div class="value"><input id="wallet-USDT" name="wallet-USDT" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.USDT||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">BTC</div><div class="value"><input id="wallet-BTC" name="wallet-BTC" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.BTC||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">ETH</div><div class="value"><input id="wallet-ETH" name="wallet-ETH" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.ETH||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">USDC</div><div class="value"><input id="wallet-USDC" name="wallet-USDC" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.USDC||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">PYUSD</div><div class="value"><input id="wallet-PYUSD" name="wallet-PYUSD" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.PYUSD||''}"></div></div>
+            <div class="row" style="margin-top:8px"><div class="label">SOL</div><div class="value"><input id="wallet-SOL" name="wallet-SOL" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.SOL||''}"></div></div>
+
+                <div id="formMsg" style="margin-top:10px;color:#9fb4d9"></div>
+          </form>
         `;
         content.innerHTML = html;
+            // Save handler used by the top Update button
+            function saveProfile(buttonEl){
+              const topBtn = buttonEl || document.getElementById('topSaveBtn');
+              if(topBtn) topBtn.disabled = true, topBtn.textContent = 'Saving...';
+              const fullname = document.getElementById('fullname').value.trim();
+              const email = document.getElementById('email').value.trim();
+              const telegram = document.getElementById('telegram').value.trim();
+              const wallets = {
+                USDT: document.getElementById('wallet-USDT').value.trim(),
+                BTC: document.getElementById('wallet-BTC').value.trim(),
+                ETH: document.getElementById('wallet-ETH').value.trim(),
+                USDC: document.getElementById('wallet-USDC').value.trim(),
+                PYUSD: document.getElementById('wallet-PYUSD').value.trim(),
+                SOL: document.getElementById('wallet-SOL').value.trim()
+              };
+
+              const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+              fetch('/api/admin/update-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ fullname, email, telegram, wallets })
+              }).then(r=>r.json()).then(resp=>{
+                if(resp && resp.success){
+                  document.getElementById('formMsg').textContent = 'Profile updated.';
+                } else {
+                  document.getElementById('formMsg').textContent = (resp && resp.error) ? resp.error : 'Failed to update';
+                }
+              }).catch(e=>{
+                document.getElementById('formMsg').textContent = 'Error saving profile';
+              }).finally(()=>{ if(topBtn) { topBtn.disabled=false; topBtn.textContent='Update Profile'; } });
+            }
+
+            // Wire the top button to save
+            const topSave = document.getElementById('topSaveBtn');
+            if (topSave) {
+              topSave.addEventListener('click', function(){ saveProfile(this); });
+            }
+
+            // Allow Enter to submit from any input
+            document.getElementById('profileForm').addEventListener('keydown', function(e){
+              if(e.key === 'Enter'){
+                e.preventDefault();
+                saveProfile(topSave);
+              }
+            });
+
       }).catch(err=>{
         localStorage.removeItem('adminToken'); sessionStorage.removeItem('adminToken');
         window.location.href='login.html';

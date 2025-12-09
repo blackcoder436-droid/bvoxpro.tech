@@ -243,5 +243,26 @@ module.exports = {
     changePassword,
     generateToken,
     verifyToken,
+    // Update admin profile fields (safe merge)
+    updateAdminProfile: function(adminId, updates) {
+        const fileToRead = fs.existsSync(adminsFile) ? adminsFile : (fs.existsSync(legacyAdminsFile) ? legacyAdminsFile : null);
+        if (!fileToRead) throw new Error('Admins file not found');
+        const data = fs.readFileSync(fileToRead, 'utf8') || '[]';
+        const admins = JSON.parse(data);
+        const idx = admins.findIndex(a => a.id === adminId);
+        if (idx === -1) throw new Error('Admin not found');
+
+        // Only allow certain fields to be updated
+        const allowed = ['fullname','email','telegram','wallets'];
+        for (const key of Object.keys(updates || {})) {
+            if (allowed.includes(key)) {
+                admins[idx][key] = updates[key];
+            }
+        }
+
+        // Persist
+        fs.writeFileSync(fileToRead, JSON.stringify(admins, null, 2));
+        return admins[idx];
+    },
     hashPassword
 };
