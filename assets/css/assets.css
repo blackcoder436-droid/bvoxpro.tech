@@ -569,7 +569,7 @@ input, textarea, button, select {
     top: 0;
     left: 0;
     width: 100%;
-    background: url(/assets/img/leaf-bg.png);
+    background: url(assets/img/leaf-bg.png);
     background-size: 200vw;
     background-position-x: -80vw;
     background-repeat: no-repeat;

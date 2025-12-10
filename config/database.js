@@ -122,6 +122,20 @@ async function updateTopupStatus(topupId, status) {
     }
 }
 
+async function getAllTopups(limit = 100, skip = 0) {
+    try {
+        const results = await Topup.find({})
+            .limit(limit)
+            .skip(skip)
+            .sort({ created_at: -1 });
+        console.log(`[DB] getAllTopups -> found ${results.length} records`);
+        return results;
+    } catch (e) {
+        console.error('Error getting all topup records:', e);
+        return [];
+    }
+}
+
 // Withdrawal functions
 async function createWithdrawal(withdrawalData) {
     try {
@@ -472,8 +486,14 @@ async function getAllAdmins(limit = 50) {
 
 async function getAdminById(adminId) {
     try {
-        // Try both id field and _id
-        const admin = await Admin.findOne({ $or: [{ id: adminId }, { _id: adminId }] });
+        // Try matching the `id` field first. Only include `_id` if the provided
+        // value looks like a valid Mongo ObjectId to avoid Mongoose cast errors.
+        const mongoose = require('mongoose');
+        const orClauses = [ { id: adminId } ];
+        if (mongoose.Types.ObjectId.isValid(String(adminId))) {
+            orClauses.push({ _id: adminId });
+        }
+        const admin = await Admin.findOne({ $or: orClauses });
         return admin;
     } catch (e) {
         console.error('Error getting admin by id:', e);
@@ -506,6 +526,7 @@ module.exports = {
     createTopup,
     getUserTopupRecords,
     updateTopupStatus,
+    getAllTopups,
     // Withdrawals
     createWithdrawal,
     getUserWithdrawalRecords,
@@ -544,8 +565,9 @@ module.exports = {
     markNotificationAsRead,
     // Admin
     getAdminByUsername,
-    getAllAdmins
-    ,
+    getAllAdmins,
+    getAdminById,
+    updateUserFlags,
     // helper
     createUser
 };

@@ -1426,11 +1426,15 @@
             const container = document.getElementById('userListContainer');
             container.innerHTML = '<div class="loading">Loading users...</div>';
 
+            // Get token from storage
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+
             // Try to fetch from API first
             $.ajax({
                 url: '/api/admin/users',
                 method: 'GET',
                 timeout: 5000,
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 success: function(response) {
                     try {
                         if (response && response.success && Array.isArray(response.users)) {
@@ -1645,9 +1649,11 @@
 
         // Load users on page load (try API, else fallback to static file)
         function loadUsers() {
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
             $.ajax({
                 url: '/api/admin/users',
                 method: 'GET',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 success: function(response) {
                     try {
                         if (response && response.success && Array.isArray(response.users)) {
@@ -1730,9 +1736,11 @@
         }
 
         function loadUserDetails(userId) {
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
             $.ajax({
                 url: `/api/admin/user-stats?user_id=${userId}`,
                 method: 'GET',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 success: function(response) {
                     if (response.success) {
                         displayUserDetails(response.user, response.stats);
@@ -1812,6 +1820,7 @@
         // Update Balance Form
         $('#updateBalanceForm').on('submit', function(e) {
             e.preventDefault();
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
             const coin = $('#coinSelect').val();
             const amount = $('#newAmount').val();
 
@@ -1824,6 +1833,7 @@
                 url: '/api/admin/update-balance',
                 method: 'POST',
                 contentType: 'application/json',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 data: JSON.stringify({
                     user_id: selectedUserId,
                     coin: coin,
@@ -1845,6 +1855,7 @@
         // Add Top-up Form
         $('#addTopupForm').on('submit', function(e) {
             e.preventDefault();
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
             const coin = $('#topupCoin').val();
             const amount = $('#topupAmount').val();
 
@@ -1857,6 +1868,7 @@
                 url: '/api/admin/add-topup',
                 method: 'POST',
                 contentType: 'application/json',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 data: JSON.stringify({
                     user_id: selectedUserId,
                     coin: coin,
@@ -1878,6 +1890,7 @@
         // Add Withdrawal Form
         $('#addWithdrawalForm').on('submit', function(e) {
             e.preventDefault();
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
             const coin = $('#withdrawalCoin').val();
             const address = $('#withdrawalAddress').val();
             const quantity = $('#withdrawalQuantity').val();
@@ -1890,6 +1903,8 @@
             $.ajax({
                 url: '/api/admin/add-withdrawal',
                 method: 'POST',
+                contentType: 'application/json',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 contentType: 'application/json',
                 data: JSON.stringify({
                     user_id: selectedUserId,

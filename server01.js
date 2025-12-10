@@ -3860,7 +3860,7 @@ const server = http.createServer((req, res) => {
                     const maxId = users.reduce((max, u) => {
                         const id = parseInt(u.userid || u.uid || '0', 10) || 0;
                         return Math.max(max, id);
-                    }, 342015);
+                    }, 342019);
                     const nextId = String(maxId + 1);
                     user = {
                         userid: nextId,

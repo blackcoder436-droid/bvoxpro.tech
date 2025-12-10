@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API Routes for Database Operations
  * Handles all HTTP endpoints for database access
  */
@@ -12,22 +12,8 @@ const path = require('path');
 const https = require('https');
 const ethers = require('ethers');
 
-// Simple in-memory admin token map for session emulation in dev
-const adminTokens = new Map();
-
-function base64UrlEncode(obj) {
-    const s = JSON.stringify(obj);
-    return Buffer.from(s).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-function createAdminToken(adminId, expiresInSeconds = 60 * 60 * 24) {
-    const header = base64UrlEncode({ alg: 'none', typ: 'JWT' });
-    const payload = base64UrlEncode({ adminId: String(adminId), exp: Math.floor(Date.now() / 1000) + expiresInSeconds });
-    const signature = Math.random().toString(36).substring(2, 10);
-    const token = `${header}.${payload}.${signature}`;
-    adminTokens.set(token, String(adminId));
-    return token;
-}
+// Use authModel for admin auth (supports DB-first, JSON fallback)
+const auth = require('../authModel');
 
 async function verifyAdminToken(req) {
     const header = req.headers['authorization'] || req.headers['Authorization'] || '';
@@ -35,27 +21,63 @@ async function verifyAdminToken(req) {
     const parts = header.split(' ');
     if (parts.length !== 2) return null;
     const token = parts[1];
-    const adminId = adminTokens.get(token);
-    if (!adminId) return null;
-    // check payload expiry if possible
-    try {
-        const payloadPart = token.split('.')[1];
-        if (payloadPart) {
-            const payloadJson = JSON.parse(Buffer.from(payloadPart, 'base64').toString('utf8'));
-            if (payloadJson.exp && payloadJson.exp < Math.floor(Date.now() / 1000)) {
-                adminTokens.delete(token);
-                return null;
-            }
-        }
-    } catch (e) { /* ignore parsing issues */ }
-    // fetch admin
-    const admin = await db.getAdminById(adminId);
+    // verify token signature and expiry via authModel
+    const payload = auth.verifyToken(token);
+    if (!payload || !payload.adminId) return null;
+    // fetch admin using authModel (which will fallback to JSON file if needed)
+    const admin = await auth.getAdminById(payload.adminId);
     return admin;
 }
 
 // Ensure uploads directory exists
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 try { if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) { console.warn('Could not create uploads dir:', e.message); }
+
+// ============= PROXY ROUTES =============
+
+// Proxy for /api/Trade/gettradlist to remote API (note: remote URL has 'e' in gettradelist)
+const REMOTE_TRADE_LIST_URL = 'https://api.bvoxf.com/api/Trade/gettradelist';
+router.post(['/api/Trade/gettradlist', '/api/trade/gettradlist'], (req, res) => {
+    try {
+        // Convert body to URL-encoded form (matching what old server.js does)
+        let bodyStr = '';
+        const body = req.body || {};
+        if (typeof body === 'string') {
+            bodyStr = body;
+        } else if (typeof body === 'object') {
+            // Convert JSON body to URL-encoded format: key1=value1&key2=value2
+            bodyStr = Object.keys(body)
+                .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(body[key])}`)
+                .join('&');
+        }
+        
+        const urlObj = new URL(REMOTE_TRADE_LIST_URL);
+        const options = {
+            hostname: urlObj.hostname,
+            path: urlObj.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(bodyStr)
+            }
+        };
+        const proxyReq = https.request(options, proxyRes => {
+            let data = '';
+            proxyRes.on('data', chunk => { data += chunk; });
+            proxyRes.on('end', () => {
+                res.status(proxyRes.statusCode).set(proxyRes.headers).send(data);
+            });
+        });
+        proxyReq.on('error', err => {
+            console.error('[proxy] /api/Trade/gettradlist error:', err.message);
+            res.status(502).json({ error: 'Proxy error', detail: err.message });
+        });
+        proxyReq.write(bodyStr);
+        proxyReq.end();
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // ============= USER ENDPOINTS =============
 
@@ -102,7 +124,311 @@ router.put('/api/users/:userId/balances', async (req, res) => {
     }
 });
 
+// ============= ADMIN AUTH & MANAGEMENT =============
+
+// POST /api/admin/login
+router.post('/api/admin/login', async (req, res) => {
+    try {
+        const { username, password } = req.body || {};
+        if (!username || !password) return res.status(400).json({ success: false, error: 'Missing username/password' });
+        // Use authModel which supports DB-first and JSON fallback and password hashing
+        try {
+            const result = await auth.loginAdmin(username, password);
+            // result includes token and adminId
+            return res.json({ success: true, token: result.token, adminId: result.adminId });
+        } catch (authErr) {
+            return res.status(401).json({ success: false, error: authErr.message || 'Invalid credentials' });
+        }
+    } catch (e) {
+        console.error('[admin/login] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/admin/register
+router.post('/api/admin/register', async (req, res) => {
+    try {
+        const { username, password, fullname, email } = req.body || {};
+        if (!username || !password) return res.status(400).json({ success: false, error: 'Missing required fields' });
+        try {
+            const created = await auth.registerAdmin(fullname || '', username, email || '', password);
+            return res.json({ success: true, admin: created });
+        } catch (e) {
+            return res.status(400).json({ success: false, error: e.message });
+        }
+    } catch (e) {
+        console.error('[admin/register] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/admin/me
+router.get('/api/admin/me', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        return res.json({ success: true, admin: admin });
+    } catch (e) {
+        console.error('[admin/me] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/admin/list
+router.get('/api/admin/list', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const admins = await auth.getAllAdmins();
+        return res.json({ success: true, admins });
+    } catch (e) {
+        console.error('[admin/list] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/admin/update-profile
+router.post('/api/admin/update-profile', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const { fullname, email, telegram, wallets } = req.body || {};
+        const updates = {};
+        if (fullname) updates.fullname = fullname;
+        if (email) updates.email = email;
+        if (telegram) updates.telegram = telegram;
+        if (wallets && typeof wallets === 'object') updates.wallets = wallets;
+        const updated = await auth.updateAdminProfile(admin.id || admin._id || admin.id, updates);
+        return res.json({ success: true, admin: updated });
+    } catch (e) {
+        console.error('[admin/update-profile] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/admin/users - returns users list for admin pages
+router.get('/api/admin/users', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const limit = parseInt(req.query.limit) || 200;
+        const users = await db.getAllUsers(limit, 0);
+        return res.json({ success: true, users });
+    } catch (e) {
+        console.error('[admin/users] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/admin/set-user-flag
+router.post('/api/admin/set-user-flag', async (req, res) => {
+    try {
+        // legacy frontends may send urlencoded body
+        const admin = await verifyAdminToken(req).catch(()=>null);
+        // Allow this endpoint without auth for local dev admin tools (optional)
+        const user_id = req.body.user_id || req.body.userid || req.body.uid;
+        const flag = req.body.flag;
+        const value = req.body.value === 'true' || req.body.value === true || req.body.value === 1 || req.body.value === '1';
+        if (!user_id || !flag) return res.status(400).json({ success: false, error: 'Missing user_id or flag' });
+        const updated = await db.updateUserFlags(user_id, { [flag]: value });
+        if (!updated) return res.status(500).json({ success: false, error: 'Failed to update user' });
+        return res.json({ success: true, user: updated });
+    } catch (e) {
+        console.error('[admin/set-user-flag] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/admin/update-balance
+router.post('/api/admin/update-balance', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const user_id = req.body.user_id || req.body.userid || req.body.uid;
+        const balance = Number(req.body.balance || req.body.amount || 0);
+        if (!user_id) return res.status(400).json({ success: false, error: 'Missing user_id' });
+        const updated = await db.updateUserBalance(user_id, balance);
+        if (!updated) return res.status(404).json({ success: false, error: 'User not found' });
+        return res.json({ success: true, user: updated });
+    } catch (e) {
+        console.error('[admin/update-balance] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/admin/topup-records - Get all topup records (MongoDB)
+router.get('/api/admin/topup-records', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        
+        const records = await db.getAllTopups();
+        return res.json({ success: true, records });
+    } catch (e) {
+        console.error('[admin/topup-records] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/admin/add-topup
+router.post('/api/admin/add-topup', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const body = req.body || {};
+        const topupData = {
+            id: body.id || `topup_${Date.now()}`,
+            user_id: body.user_id || body.userid,
+            coin: body.coin || body.currency || 'USDT',
+            address: body.address || '',
+            photo_url: body.photo_url || body.photo || '',
+            amount: Number(body.amount || 0) || 0,
+            status: body.status || 'pending',
+            timestamp: Date.now(),
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+        const created = await db.createTopup(topupData);
+        if (!created) return res.status(500).json({ success: false, error: 'Failed to create topup' });
+        return res.json({ success: true, data: created });
+    } catch (e) {
+        console.error('[admin/add-topup] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/admin/add-withdrawal
+router.post('/api/admin/add-withdrawal', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const body = req.body || {};
+        const withdrawalData = {
+            id: body.id || `withdrawal_${Date.now()}`,
+            user_id: body.user_id || body.userid,
+            coin: body.coin || 'USDT',
+            address: body.address || '',
+            amount: Number(body.amount || body.quantity || 0) || 0,
+            status: body.status || 'pending',
+            timestamp: Date.now(),
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+        const created = await db.createWithdrawal(withdrawalData);
+        if (!created) return res.status(500).json({ success: false, error: 'Failed to create withdrawal' });
+        return res.json({ success: true, data: created });
+    } catch (e) {
+        console.error('[admin/add-withdrawal] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ============= TOPUP ENDPOINTS =============
+
+// GET /api/admin/topup-records - Get all topup records for admin dashboard
+router.get('/api/admin/topup-records', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const limit = parseInt(req.query.limit) || 100;
+        const skip = parseInt(req.query.skip) || 0;
+        const records = await db.getAllTopups(limit, skip);
+        return res.json({ success: true, records });
+    } catch (e) {
+        console.error('[admin/topup-records] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// PUT /api/admin/topup/approve-mongo - Approve topup and add to user balance
+router.put('/api/admin/topup/approve-mongo', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing topup ID' });
+        
+        // Get the topup record
+        const Topup = require('../models/Topup');
+        const topup = await Topup.findByIdAndUpdate(
+            id,
+            { status: 'complete', updated_at: new Date() },
+            { new: true }
+        );
+        
+        if (!topup) return res.status(404).json({ success: false, error: 'Topup record not found' });
+        
+        // Update user balance - search by userid field (string), not _id
+        const User = require('../models/User');
+        const coinKey = `balances.${topup.coin.toLowerCase()}`;
+        const updated = await User.findOneAndUpdate(
+            { userid: topup.user_id },  // Search by userid field which matches topup.user_id
+            { $inc: { [coinKey]: topup.amount } },
+            { new: true }
+        );
+        
+        if (!updated) {
+            console.warn(`[admin/topup/approve-mongo] User not found for user_id: ${topup.user_id}`);
+        }
+        
+        console.log(`[admin/topup/approve-mongo] Approved topup ${id} for user ${topup.user_id}: +${topup.amount} ${topup.coin}`);
+        return res.json({ success: true, record: topup, updatedUser: updated });
+    } catch (e) {
+        console.error('[admin/topup/approve-mongo] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// PUT /api/admin/topup/reject-mongo - Reject topup record
+router.put('/api/admin/topup/reject-mongo', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing topup ID' });
+        
+        // Update topup status to rejected
+        const Topup = require('../models/Topup');
+        const topup = await Topup.findByIdAndUpdate(
+            id,
+            { status: 'rejected', updated_at: new Date() },
+            { new: true }
+        );
+        
+        if (!topup) return res.status(404).json({ success: false, error: 'Topup record not found' });
+        
+        console.log(`[admin/topup/reject-mongo] Rejected topup ${id} for user ${topup.user_id}`);
+        return res.json({ success: true, record: topup });
+    } catch (e) {
+        console.error('[admin/topup/reject-mongo] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// DELETE /api/admin/topup/delete - Delete topup record
+router.delete('/api/admin/topup/delete', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing topup ID' });
+        
+        // Delete topup record
+        const Topup = require('../models/Topup');
+        const deleted = await Topup.findByIdAndDelete(id);
+        
+        if (!deleted) return res.status(404).json({ success: false, error: 'Topup record not found' });
+        
+        console.log(`[admin/topup/delete] Deleted topup ${id}`);
+        return res.json({ success: true, message: 'Record deleted successfully' });
+    } catch (e) {
+        console.error('[admin/topup/delete] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 router.post('/api/topup', async (req, res) => {
     try {
@@ -275,6 +601,32 @@ router.post('/api/exchange', async (req, res) => {
             updated_at: new Date()
         };
         const exchange = await db.createExchangeRecord(exchangeData);
+        // After saving the exchange record, update user's balances in DB
+        try {
+            if (exchange && exchange.user_id) {
+                const user = await db.getUserById(exchange.user_id);
+                if (user) {
+                    const balances = Object.assign({}, user.balances || {});
+                    const fromKey = (exchange.from_coin || '').toLowerCase();
+                    const toKey = (exchange.to_coin || '').toLowerCase();
+                    const fromAmount = Number(exchange.from_amount) || 0;
+                    const toAmount = Number(exchange.to_amount) || 0;
+
+                    // Ensure keys exist
+                    const keys = ['usdt','btc','eth','usdc','pyusd','sol'];
+                    keys.forEach(k => { if (balances[k] === undefined || balances[k] === null) balances[k] = Number(user.balances && user.balances[k] ? user.balances[k] : (user[k] || 0)) || 0; });
+
+                    balances[fromKey] = Math.max(0, (Number(balances[fromKey]) || 0) - fromAmount);
+                    balances[toKey] = (Number(balances[toKey]) || 0) + toAmount;
+
+                    await db.updateUserBalances(exchange.user_id, balances);
+                    console.log(`[api] /api/exchange - updated balances for user ${exchange.user_id}: -${fromAmount} ${fromKey} +${toAmount} ${toKey}`);
+                }
+            }
+        } catch (balErr) {
+            console.error('[api] /api/exchange - failed to update balances:', balErr && balErr.message);
+        }
+
         res.status(201).json(exchange);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -288,6 +640,68 @@ router.get('/api/exchange/:userId', async (req, res) => {
         res.json(records);
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// Legacy POST route used by older frontend: /api/exchange-record
+router.post('/api/exchange-record', async (req, res) => {
+    try {
+        const exchangeData = {
+            id: req.body.id || `exchange_${Date.now()}_${uuidv4().substring(0, 9)}`,
+            user_id: req.body.user_id,
+            from_coin: req.body.from_coin,
+            to_coin: req.body.to_coin,
+            from_amount: req.body.from_amount,
+            to_amount: req.body.to_amount,
+            rate: req.body.rate || 0,
+            status: req.body.status || 'completed',
+            timestamp: Date.now(),
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+
+        const exchange = await db.createExchangeRecord(exchangeData);
+        if (!exchange) return res.status(500).json({ success: false, error: 'Failed to save record' });
+        // Update user's balances (legacy handler)
+        try {
+            if (exchange && exchange.user_id) {
+                const user = await db.getUserById(exchange.user_id);
+                if (user) {
+                    const balances = Object.assign({}, user.balances || {});
+                    const fromKey = (exchange.from_coin || '').toLowerCase();
+                    const toKey = (exchange.to_coin || '').toLowerCase();
+                    const fromAmount = Number(exchange.from_amount) || 0;
+                    const toAmount = Number(exchange.to_amount) || 0;
+                    const keys = ['usdt','btc','eth','usdc','pyusd','sol'];
+                    keys.forEach(k => { if (balances[k] === undefined || balances[k] === null) balances[k] = Number(user.balances && user.balances[k] ? user.balances[k] : (user[k] || 0)) || 0; });
+                    balances[fromKey] = Math.max(0, (Number(balances[fromKey]) || 0) - fromAmount);
+                    balances[toKey] = (Number(balances[toKey]) || 0) + toAmount;
+                    await db.updateUserBalances(exchange.user_id, balances);
+                    console.log(`[api] /api/exchange-record - updated balances for user ${exchange.user_id}: -${fromAmount} ${fromKey} +${toAmount} ${toKey}`);
+                }
+            }
+        } catch (balErr) {
+            console.error('[api] /api/exchange-record - failed to update balances:', balErr && balErr.message);
+        }
+
+        return res.json({ success: true, record: exchange });
+    } catch (e) {
+        console.error('[api] /api/exchange-record error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Legacy route used by some frontend pages: /api/exchange-records?user_id=123
+router.get('/api/exchange-records', async (req, res) => {
+    try {
+        const user_id = req.query.user_id || req.query.userid || req.query.userId;
+        if (!user_id) return res.status(400).json({ error: 'Missing user_id parameter' });
+        const limit = parseInt(req.query.limit) || 50;
+        const records = await db.getUserExchangeRecords(user_id, limit);
+        return res.json({ success: true, records });
+    } catch (e) {
+        console.error('[api] /api/exchange-records error:', e && e.message);
+        return res.status(500).json({ success: false, records: [], error: e.message });
     }
 });
 
@@ -462,6 +876,8 @@ async function handleGetBalance(req, res) {
 
     try {
         console.log('[api] POST /api/wallet/getbalance called with body:', req.body);
+        const remoteAddr = req.headers['x-forwarded-for'] || (req.connection && req.connection.remoteAddress) || req.ip || 'unknown';
+        console.log(`[api] /api/wallet/getbalance request from ${remoteAddr}`);
         // Accept legacy param names from older frontends: userid, user_id, uid
         const body = req.body || {};
         const address = body.address || body.addr || null;
@@ -471,22 +887,30 @@ async function handleGetBalance(req, res) {
             return res.status(400).json({ error: 'Provide user_id/(userid/uid) or address in request body' });
         }
 
-        if (address) {
+        // If both user_id and address are present, prefer user_id (db user balances take precedence)
+        if (address && !user_id) {
             const wallet = await db.getWalletByAddress(address);
             if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
-            const payload = Object.assign({}, wallet.balances || {}, { total_balance: wallet.balance || 0, wallet });
+            const walletBalances = wallet.balances || {};
+            const payload = Object.assign({}, walletBalances, { total_balance: Number(wallet.balance) || 0, wallets: [wallet] });
             return res.json({ code: 1, data: payload });
         }
 
-        // Aggregate wallets for user
+        // PRIORITY: Check User record's balances first (these are updated by topup approvals)
+        const userRecord = await db.getUserById(user_id);
+        if (userRecord && userRecord.balances && Object.keys(userRecord.balances).length > 0) {
+            // User has balances stored on their record - use these (they're updated by admin topup approvals)
+            const userBalances = userRecord.balances;
+            const totalFromUser = Object.keys(userBalances).reduce((acc, k) => acc + (Number(userBalances[k]) || 0), 0);
+            console.log('[api] /api/wallet/getbalance - returning User record balances:', userBalances);
+            return res.json({ code: 1, data: Object.assign({}, userBalances, { total_balance: totalFromUser, wallets: [] }) });
+        }
+
+        // FALLBACK: Aggregate wallets for user if no user balances exist
         const wallets = await db.getUserWallets(user_id);
         if (!wallets || wallets.length === 0) {
-            // If there are no wallet documents, fall back to user's balances stored on the user record
-            const userRecord = await db.getUserById(user_id);
-            const userBalances = (userRecord && userRecord.balances) ? userRecord.balances : {};
-            const totalFromUser = Object.keys(userBalances).reduce((acc, k) => acc + (Number(userBalances[k]) || 0), 0);
-            // Return balances in the flat shape the legacy frontend expects (top-level keys like usdt, eth)
-            return res.json({ code: 1, data: Object.assign({}, userBalances, { total_balance: totalFromUser, wallets: [] }) });
+            // No wallet documents and no user balances - return empty structured response
+            return res.json({ code: 1, data: { usdt: 0, btc: 0, eth: 0, usdc: 0, pyusd: 0, sol: 0, total_balance: 0, wallets: [] } });
         }
 
         // sum numeric balances from wallet documents
@@ -503,7 +927,8 @@ async function handleGetBalance(req, res) {
         });
 
         // Return flat balance keys so assets.html can read them as `res.data` or `res`
-        res.json({ code: 1, data: Object.assign({}, aggregated, { total_balance: totalBalance, wallets }) });
+        const normalized = Object.assign({ usdt: 0, btc: 0, eth: 0, usdc: 0, pyusd: 0, sol: 0 }, aggregated, { total_balance: totalBalance, wallets });
+        res.json({ code: 1, data: normalized });
     } catch (e) {
         console.error('[api] /api/wallet/getbalance error:', e);
         res.status(500).json({ error: e.message });
@@ -512,6 +937,84 @@ async function handleGetBalance(req, res) {
 
 router.post('/api/wallet/getbalance', handleGetBalance);
 router.post('/api/Wallet/getbalance', handleGetBalance);
+
+// ============= GET COIN DATA ENDPOINTS =============
+
+// GET /api/Wallet/getcoin_all_data - Fetch all coin price data from external API or fallback
+router.post(['/api/Wallet/getcoin_all_data', '/api/wallet/getcoin_all_data'], (req, res) => {
+    try {
+        const externalApiUrls = [
+            'https://api.bvoxf.com/api/Wallet/getcoin_all_data'
+            //'https://api.bitcryptoforest.com/api/kline/getAllProduct'
+        ];
+
+        const tryProxy = (index) => {
+            if (index >= externalApiUrls.length) {
+                // External APIs unavailable — return a small local fallback dataset with realistic prices
+                const sampleData = [
+                    { symbol: 'btcusdt', close: 95000 },      // BTC ~$95,000
+                    { symbol: 'ethusdt', close: 3500 },       // ETH ~$3,500
+                    { symbol: 'usdcusdt', close: 1.00 },      // USDC = $1.00
+                    { symbol: 'pyusdusdt', close: 1.00 },     // PYUSD = $1.00
+                    { symbol: 'solusdt', close: 180 }         // SOL ~$180
+                ];
+
+                const fallback = {
+                    code: 1,
+                    data: {
+                        data: sampleData
+                    }
+                };
+
+                console.warn('[getcoin_all_data] External APIs down — returning local fallback prices');
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(fallback));
+                return;
+            }
+
+            const externalApiUrl = externalApiUrls[index];
+            
+            const externalReq = https.request(externalApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Length': 0
+                }
+            }, (externalRes) => {
+                let responseData = '';
+                externalRes.on('data', chunk => { responseData += chunk; });
+                externalRes.on('end', () => {
+                    // If external returns 200, forward it; otherwise try next
+                    if (externalRes.statusCode >= 200 && externalRes.statusCode < 300) {
+                        res.writeHead(externalRes.statusCode, { 'Content-Type': 'application/json' });
+                        res.end(responseData);
+                    } else {
+                        // Only log non-200 responses
+                        try {
+                            const snippet = responseData ? responseData.substring(0, 300) : '';
+                            console.error('[getcoin_all_data] External response error from', externalApiUrl, 'status=', externalRes.statusCode, 'bodySnippet=', snippet.replace(/\n/g, '\\n'));
+                        } catch (logErr) {
+                            console.error('[getcoin_all_data] Error logging external response:', logErr.message);
+                        }
+                        tryProxy(index + 1);
+                    }
+                });
+            });
+
+            externalReq.on('error', (err) => {
+                console.error('[getcoin_all_data] External request error for', externalApiUrl, ':', err.message);
+                tryProxy(index + 1);
+            });
+
+            externalReq.end();
+        };
+
+        tryProxy(0);
+    } catch (e) {
+        console.error('[getcoin_all_data] Error:', e.message);
+        res.status(400).json({ code: 0, data: e.message });
+    }
+});
 
 // ============= KYC ENDPOINTS =============
 
@@ -946,10 +1449,16 @@ router.post(['/api/user/getuserid', '/api/User/getuserid'], async (req, res) => 
 
         // If still not found, create a new user
         if (!user) {
+            // Generate next 6-digit user ID starting from 342020
+            const UserModel = require('../models/User');
+            const allUsers = await UserModel.find({}, { userid: 1 }).sort({ _id: -1 }).limit(1);
+            const maxId = allUsers.length > 0 ? parseInt(allUsers[0].userid || '342019', 10) : 342019;
+            const nextUserId = String(maxId + 1);
+            
             const newUser = {
-                userid: Date.now().toString(),
-                uid: Date.now().toString(),
-                username: `user_${Date.now().toString().slice(-6)}`,
+                userid: nextUserId,
+                uid: nextUserId,
+                username: `user_${nextUserId}`,
                 wallet_address: address,
                 balance: 0,
                 balances: { usdt: 0, btc: 0, eth: 0, usdc: 0, pyusd: 0, sol: 0 }

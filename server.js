@@ -18,6 +18,8 @@ const { saveTopupRecord, getUserTopupRecords } = require('./topupRecordModel');
 const { saveWithdrawalRecord, getUserWithdrawalRecords } = require('./withdrawalRecordModel');
 const { saveExchangeRecord, getUserExchangeRecords } = require('./exchangeRecordModel');
 const { getAllUsers, getUserById, updateUserBalance, getUserStats, addTopupRecord, addWithdrawalRecord, deleteTransaction, setUserFlag } = require('./adminModel');
+const Topup = require('./models/Topup');
+const User = require('./models/User');
 const { registerAdmin, loginAdmin, getAdminById, getAllAdmins, verifyToken, updateAdminProfile } = require('./authModel');
 const { getAllArbitrageProducts, getArbitrageProductById, createArbitrageSubscription, getUserArbitrageSubscriptions, getUserArbitrageStats } = require('./arbitrageModel');
 const { settleArbitrageSubscriptions } = require('./arbitrageModel');
@@ -260,7 +262,7 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/topup-record' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 // Remove any query parameters appended by jQuery beforeSend
                 // e.g., "&yanzheng=...", "&token=...", "&address=...", "&sid=..."
@@ -1715,7 +1717,7 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/admin/register' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 let jsonBody = body;
                 if (body.includes('}&')) {
@@ -1731,7 +1733,7 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                const admin = registerAdmin(fullname, username, email, password);
+                const admin = await registerAdmin(fullname, username, email, password);
                 res.writeHead(201, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, message: 'Admin registered successfully', admin: { id: admin.id, username: admin.username, email: admin.email } }));
             } catch (e) {
@@ -1747,6 +1749,7 @@ const server = http.createServer((req, res) => {
     
     // Get current admin info (requires valid token) - GET /api/admin/me
     if (pathname === '/api/admin/me' && req.method === 'GET') {
+        (async () => {
         try {
             const authHeader = req.headers['authorization'] || '';
             const token = authHeader.replace('Bearer ', '') || url.parse(req.url, true).query.token;
@@ -1764,7 +1767,7 @@ const server = http.createServer((req, res) => {
                 return;
             }
             
-            const admin = getAdminById(decoded.adminId);
+            const admin = await getAdminById(decoded.adminId);
             if (!admin) {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Admin not found' }));
@@ -1790,11 +1793,13 @@ const server = http.createServer((req, res) => {
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Authentication failed' }));
         }
+        })();
         return;
     }
 
     // Get all admin accounts (requires valid token) - GET /api/admin/list
     if (pathname === '/api/admin/list' && req.method === 'GET') {
+        (async () => {
         try {
             const authHeader = req.headers['authorization'] || '';
             const token = authHeader.replace('Bearer ', '') || url.parse(req.url, true).query.token;
@@ -1812,7 +1817,7 @@ const server = http.createServer((req, res) => {
                 return;
             }
             
-            const admins = getAllAdmins();
+            const admins = await getAllAdmins();
             // Return admin list without passwords
             const safeAdmins = admins.map(a => ({
                 id: a.id,
@@ -1831,6 +1836,7 @@ const server = http.createServer((req, res) => {
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Authentication failed' }));
         }
+        })();
         return;
     }
 
@@ -1838,7 +1844,7 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/admin/update-profile' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const authHeader = req.headers['authorization'] || '';
                 const token = authHeader.replace('Bearer ', '') || url.parse(req.url, true).query.token;
@@ -1867,7 +1873,7 @@ const server = http.createServer((req, res) => {
                     updates.wallets = data.wallets;
                 }
 
-                const updated = updateAdminProfile(decoded.adminId, updates);
+                const updated = await updateAdminProfile(decoded.adminId, updates);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, admin: { id: updated.id, fullname: updated.fullname, email: updated.email, telegram: updated.telegram || '', wallets: updated.wallets || {} } }));
             } catch (e) {
@@ -1981,6 +1987,192 @@ const server = http.createServer((req, res) => {
                 console.error('[admin-update-balance] Error:', e.message);
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+        return;
+    }
+
+    // Get all topup records (admin) - MongoDB
+    if (pathname === '/api/admin/topup-records' && req.method === 'GET') {
+        try {
+            const token = req.headers['authorization']?.replace('Bearer ', '');
+            if (!token) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+                return;
+            }
+
+            const adminData = verifyToken(token);
+            if (!adminData) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Invalid or expired token' }));
+                return;
+            }
+
+            // Use async IIFE to handle async Mongoose operation
+            (async () => {
+                try {
+                    const records = await Topup.find({}).sort({ created_at: -1 });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, records }));
+                } catch (err) {
+                    console.error('[admin-topup-records] Error fetching from MongoDB:', err);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Failed to fetch records' }));
+                }
+            })();
+        } catch (e) {
+            console.error('[admin-topup-records] Error:', e.message);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+        return;
+    }
+
+    // Approve topup record - MongoDB (admin)
+    if (pathname === '/api/admin/topup/approve-mongo' && req.method === 'PUT') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+            try {
+                const token = req.headers['authorization']?.replace('Bearer ', '');
+                if (!token) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+                    return;
+                }
+
+                const adminData = verifyToken(token);
+                if (!adminData) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Invalid or expired token' }));
+                    return;
+                }
+
+                const data = JSON.parse(body);
+                const { id } = data;
+
+                if (!id) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Missing topup ID' }));
+                    return;
+                }
+
+                const topup = await Topup.findByIdAndUpdate(id, { status: 'complete', updated_at: new Date() }, { new: true });
+
+                if (!topup) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Topup record not found' }));
+                    return;
+                }
+
+                // Update user balance in MongoDB
+                const user = await User.findByIdAndUpdate(topup.user_id, {
+                    $inc: { 'wallets.USDT': topup.amount }
+                }, { new: true });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, record: topup }));
+            } catch (e) {
+                console.error('[admin-topup-approve-mongo] Error:', e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    // Reject topup record - MongoDB (admin)
+    if (pathname === '/api/admin/topup/reject-mongo' && req.method === 'PUT') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+            try {
+                const token = req.headers['authorization']?.replace('Bearer ', '');
+                if (!token) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+                    return;
+                }
+
+                const adminData = verifyToken(token);
+                if (!adminData) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Invalid or expired token' }));
+                    return;
+                }
+
+                const data = JSON.parse(body);
+                const { id } = data;
+
+                if (!id) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Missing topup ID' }));
+                    return;
+                }
+
+                const topup = await Topup.findByIdAndUpdate(id, { status: 'rejected', updated_at: new Date() }, { new: true });
+
+                if (!topup) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Topup record not found' }));
+                    return;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, record: topup }));
+            } catch (e) {
+                console.error('[admin-topup-reject-mongo] Error:', e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    // Delete topup record - MongoDB (admin)
+    if (pathname === '/api/admin/topup/delete' && req.method === 'DELETE') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+            try {
+                const token = req.headers['authorization']?.replace('Bearer ', '');
+                if (!token) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+                    return;
+                }
+
+                const adminData = verifyToken(token);
+                if (!adminData) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Invalid or expired token' }));
+                    return;
+                }
+
+                const data = JSON.parse(body);
+                const { id } = data;
+
+                if (!id) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Missing topup ID' }));
+                    return;
+                }
+
+                const topup = await Topup.findByIdAndDelete(id);
+
+                if (!topup) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Topup record not found' }));
+                    return;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Record deleted successfully' }));
+            } catch (e) {
+                console.error('[admin-topup-delete] Error:', e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
             }
         });
         return;

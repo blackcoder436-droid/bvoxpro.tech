@@ -657,13 +657,16 @@
         let currentPage = 1;
         const recordsPerPage = 10;
 
-        // Load all topup records
+        // Load all topup records from MongoDB
         function loadTopupRecords() {
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
             $.ajax({
-                url: '/topup_records.json',
+                url: '/api/admin/topup-records',
                 method: 'GET',
                 dataType: 'json',
-                success: function(data) {
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+                success: function(response) {
+                    const data = response.records || [];
                     allRecords = data || [];
 
                     // Assign deterministic sequential display IDs (TopUp-000000, TopUp-000001, ...)
@@ -671,21 +674,21 @@
                     const idMap = {};
                     sortedForIds.forEach((r, idx) => {
                         const num = idx;
-                        idMap[r.id] = 'TopUp-' + String(num).padStart(6, '0');
+                        idMap[r._id || r.id] = 'TopUp-' + String(num).padStart(6, '0');
                     });
-                    allRecords = allRecords.map(r => ({ ...r, display_id: idMap[r.id] || r.id }));
+                    allRecords = allRecords.map(r => ({ ...r, display_id: idMap[r._id || r.id] || r.id }));
 
                     filteredRecords = [...allRecords];
                     displayPage(1);
                 },
                 error: function(err) {
-                    console.error('Failed to load topup records:', err);
+                    console.error('Failed to load topup records from MongoDB:', err);
                     $('#depositsBody').html(`
                         <tr>
                             <td colspan="9">
                                 <div class="no-data">
                                     <div class="no-data-icon">❌</div>
-                                    <div>Failed to load deposits</div>
+                                    <div>Failed to load deposits from database</div>
                                 </div>
                             </td>
                         </tr>
@@ -790,16 +793,32 @@
                 return;
             }
 
-            const index = allRecords.findIndex(r => r.id === recordId);
-            if (index === -1) {
-                alert('Record not found');
-                return;
-            }
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+            const mongoId = allRecords.find(r => r.id === recordId)?._id || recordId;
 
-            allRecords.splice(index, 1);
-            applyFilters();
-            console.log(`Deleted record ${recordId}`);
-            alert('Record deleted successfully!');
+            $.ajax({
+                url: '/api/admin/topup/delete',
+                method: 'DELETE',
+                contentType: 'application/json',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+                data: JSON.stringify({ id: mongoId }),
+                success: function(response) {
+                    if (response.success) {
+                        const index = allRecords.findIndex(r => r.id === recordId);
+                        if (index !== -1) {
+                            allRecords.splice(index, 1);
+                        }
+                        applyFilters();
+                        alert('Record deleted successfully!');
+                    } else {
+                        alert('Error: ' + (response.error || 'Delete failed'));
+                    }
+                },
+                error: function(err) {
+                    console.error('Error deleting record:', err);
+                    alert('Failed to delete record from database');
+                }
+            });
         }
 
         // Update record status
@@ -821,35 +840,36 @@
             button.disabled = true;
             button.textContent = 'Processing...';
 
-            // Map status: "approved" -> "complete", "rejected" -> "rejected"
-            const dbStatus = newStatus === 'approved' ? 'complete' : newStatus;
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+            const mongoId = record._id || recordId;
             
-            // Determine API endpoint
+            // Determine API endpoint (use MongoDB endpoints)
             let apiUrl;
+            let displayStatus;
             if (newStatus === 'approved') {
-                apiUrl = '/api/admin/topup/approve';
+                apiUrl = '/api/admin/topup/approve-mongo';
+                displayStatus = 'approved';
             } else if (newStatus === 'rejected') {
-                apiUrl = '/api/admin/topup/reject';
+                apiUrl = '/api/admin/topup/reject-mongo';
+                displayStatus = 'rejected';
             } else {
                 button.disabled = false;
                 button.textContent = originalText;
                 return;
             }
 
-            // Call API to update JSON file
+            // Call MongoDB API
             $.ajax({
                 url: apiUrl,
                 method: 'PUT',
                 contentType: 'application/json',
-                data: JSON.stringify({ id: recordId }),
-                headers: {
-                    'X-Admin-ID': 'admin_user'
-                },
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+                data: JSON.stringify({ id: mongoId }),
                 success: function(response) {
-                    if (response.code === 1 || response.success) {
+                    if (response.success) {
                         // Update local state
-                        record.status = dbStatus;
-                        filteredRecords = filteredRecords.map(r => r.id === recordId ? record : r);
+                        record.status = newStatus === 'approved' ? 'complete' : newStatus;
+                        filteredRecords = filteredRecords.map(r => (r.id === recordId || r._id === mongoId) ? record : r);
                         
                         console.log(`✓ Successfully ${newStatus} record ${recordId}`);
                         console.log('API Response:', response);
@@ -857,17 +877,12 @@
                         alert(`Deposit ${newStatus === 'approved' ? 'approved' : 'rejected'} successfully!`);
                         displayPage(currentPage);
                     } else {
-                        alert('Error: ' + (response.info || response.message || 'Operation failed'));
+                        alert('Error: ' + (response.error || response.message || 'Operation failed'));
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error(`✗ Error updating record ${recordId}:`, error);
-                    alert('Could not connect to server. Updating locally...');
-                    
-                    // Still update locally as fallback
-                    record.status = dbStatus;
-                    filteredRecords = filteredRecords.map(r => r.id === recordId ? record : r);
-                    displayPage(currentPage);
+                    alert('Could not connect to database');
                 },
                 complete: function() {
                     button.disabled = false;
