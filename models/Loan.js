@@ -7,7 +7,7 @@ const loanSchema = new mongoose.Schema({
   interest_rate: { type: Number, default: 0 },
   duration_days: { type: Number },
   total_repay: { type: Number },
-  status: { type: String, default: 'active', enum: ['pending', 'active', 'completed', 'defaulted'] },
+  status: { type: String, default: 'active', enum: ['pending', 'active', 'approved', 'rejected', 'completed', 'defaulted'] },
   disbursed_date: { type: Date },
   due_date: { type: Date },
   repay_date: { type: Date },

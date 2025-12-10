@@ -123,5 +123,39 @@
     "settlement_applied": true,
     "created_at": "2025-12-08T22:10:44.688Z",
     "updated_at": "2025-12-08T22:10:45.863Z"
+  },
+  {
+    "id": "1765409767328",
+    "userid": "1765298563993",
+    "username": "0xB36E5a38a674E7Ee7BCd86Ca8EE777510e7EbC95",
+    "biming": "btc",
+    "fangxiang": "downward",
+    "miaoshu": "60",
+    "num": "10",
+    "buyprice": "92150.98",
+    "syl": 40,
+    "zengjia": "92171.21166435778",
+    "jianshao": "92135.9205878575",
+    "status": "pending",
+    "forcedOutcome": null,
+    "settlement_applied": false,
+    "created_at": "2025-12-10T23:36:07.328Z"
+  },
+  {
+    "id": "1765409957051",
+    "userid": "1765298563993",
+    "username": "0xB36E5a38a674E7Ee7BCd86Ca8EE777510e7EbC95",
+    "biming": "btc",
+    "fangxiang": "upward",
+    "miaoshu": "60",
+    "num": "100",
+    "buyprice": "90900.36",
+    "syl": 40,
+    "zengjia": "90903.64275013459",
+    "jianshao": "90886.90571593052",
+    "status": "pending",
+    "forcedOutcome": null,
+    "settlement_applied": false,
+    "created_at": "2025-12-10T23:39:17.051Z"
   }
 ]

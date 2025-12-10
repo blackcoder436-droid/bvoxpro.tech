@@ -473,6 +473,62 @@ router.get('/api/admin/contract/records', async (req, res) => {
     }
 });
 
+// GET /api/admin/loan-records - Get all loan records (paginated)
+router.get('/api/admin/loan-records', async (req, res) => {
+    try {
+        // Disable caching for admin API endpoints
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 100;
+        const skip = (page - 1) * limit;
+
+        const Loan = require('../models/Loan');
+
+        const totalRecords = await Loan.countDocuments();
+        const records = await Loan.find()
+            .sort({ created_at: -1 })
+            .limit(limit)
+            .skip(skip)
+            .lean();
+
+        const formatted = records.map(r => ({
+            id: r.id || r._id || '',
+            orderId: r.orderId || r.order_id || r._id || r.id || '',
+            user_id: r.user_id || r.userid || '',
+            userid: r.user_id || r.userid || '',
+            amount: Number(r.amount) || 0,
+            // Provide both legacy and new field names so older frontends work
+            interest_rate: Number(r.interest_rate) || Number(r.interest) || 0,
+            interest: Number(r.interest_rate) || Number(r.interest) || 0,
+            duration_days: Number(r.duration_days) || Number(r.days) || Number(r.tianshu) || 0,
+            days: Number(r.duration_days) || Number(r.days) || Number(r.tianshu) || 0,
+            total_repay: Number(r.total_repay) || 0,
+            status: r.status || 'pending',
+            disbursed_date: r.disbursed_date || null,
+            due_date: r.due_date || null,
+            created_at: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+            updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString()
+        }));
+
+        const totalPages = Math.ceil(totalRecords / limit);
+
+        return res.json({
+            success: true,
+            data: formatted,
+            pagination: { page, limit, total: totalRecords, pages: totalPages }
+        });
+    } catch (e) {
+        console.error('[admin/loan-records] error:', e && e.message);
+        return res.status(500).json({ success: false, data: [], message: e.message });
+    }
+});
+
 // ============= TOPUP ENDPOINTS =============
 
 // GET /api/admin/topup-records - Get all topup records for admin dashboard
@@ -1015,6 +1071,142 @@ router.post('/api/mining', async (req, res) => {
     }
 });
 
+// Legacy compatibility: POST /api/Mine/getminesy (some frontends expect this)
+router.post(['/api/Mine/getminesy','/api/mine/getminesy'], async (req, res) => {
+    try {
+        const body = req.body || {};
+        const userid = body.userid || body.user_id || body.uid || body.userid;
+        if (!userid) return res.status(400).json({ code: 0, data: 'User ID is required' });
+
+        const records = await db.getUserMiningRecords(userid);
+        // consider only active records for totals
+        const active = (records || []).filter(r => (r.status || 'active') === 'active');
+        const total_shuliang = active.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+        const total_jine = active.reduce((sum, r) => sum + (Number(r.total_earned) || 0), 0);
+        // recent_jine: approximate as daily_reward * amount where available
+        const recent_jine = active.reduce((sum, r) => sum + ((Number(r.daily_reward) || 0) * (Number(r.amount) || 0)), 0);
+
+        return res.json({ code: 1, data: { total_shuliang, total_jine, recent_jine } });
+    } catch (e) {
+        console.error('[legacy /api/Mine/getminesy] error:', e);
+        return res.status(500).json({ code: 0, data: 'Failed to get mining stats' });
+    }
+});
+
+// Legacy: GET /api/Mine/records/:userid
+router.get(['/api/Mine/records/:userid','/api/mine/records/:userid'], async (req, res) => {
+    try {
+        const userid = req.params.userid;
+        const records = await db.getUserMiningRecords(userid);
+        const formatted = (records || []).map(r => ({
+            orderId: r.id || r._id || '',
+            amount: Number(r.amount) || 0,
+            currency: r.currency || 'ETH',
+            dailyYield: (Number(r.daily_reward) ? (Number(r.daily_reward) * 100) + '%' : (r.dailyYield || '')),
+            totalIncome: Number(r.total_earned) || Number(r.totalEarned) || 0,
+            todayIncome: Number(r.daily_reward) ? (Number(r.daily_reward) * Number(r.amount || 0)) : (r.todayIncome || 0),
+            status: r.status || 'active',
+            startDate: r.start_date ? new Date(r.start_date).toISOString() : (r.startDate || new Date().toISOString())
+        }));
+        return res.json({ code: 1, data: formatted });
+    } catch (e) {
+        console.error('[legacy /api/Mine/records] error:', e);
+        return res.status(500).json({ code: 0, data: 'Failed to get mining records' });
+    }
+});
+
+// Legacy: POST /api/Mine/setmineorder - create mining order similar to old JSON flow
+router.post(['/api/Mine/setmineorder','/api/mine/setmineorder'], async (req, res) => {
+    try {
+        const body = req.body || {};
+        const userid = body.userid || body.user_id || body.uid;
+        const username = body.username || body.userName || '';
+        const jineRaw = body.jine || body.amount || body.amount_raw;
+        const jine = Number(jineRaw);
+
+        if (!userid || !jine || isNaN(jine)) return res.status(400).json({ code: 0, data: 'Invalid input parameters' });
+        const amount = parseFloat(jine);
+        if (amount <= 0) return res.status(400).json({ code: 0, data: 'Staking amount must be greater than 0' });
+        if (amount < 0.5) return res.status(400).json({ code: 0, data: 'Staking amount must be at least 0.5 ETH' });
+
+        // Get user from DB
+        const user = await db.getUserById(userid);
+        if (!user) return res.status(404).json({ code: 0, data: 'User not found' });
+
+        const currentBalance = (user.balances && (Number(user.balances.eth) || Number(user.balances.ETH))) || Number(user.eth) || 0;
+        if (currentBalance < amount) return res.status(400).json({ code: 0, data: `Insufficient ETH balance. Current: ${currentBalance} ETH, Required: ${amount} ETH` });
+
+        // Determine daily yield
+        let dailyYield = 0;
+        if (amount >= 40) dailyYield = 0.006;
+        else if (amount >= 20) dailyYield = 0.005;
+        else if (amount >= 12) dailyYield = 0.0045;
+        else if (amount >= 2) dailyYield = 0.004;
+        else if (amount >= 0.5) dailyYield = 0.003;
+
+        // Deduct balance and update user balances
+        const newBalances = Object.assign({}, user.balances || {});
+        newBalances.eth = (Number(newBalances.eth) || Number(user.eth) || 0) - amount;
+        await db.updateUserBalances(userid, newBalances);
+
+        // Create mining record in DB
+        const miningId = `mining_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        const miningRecord = {
+            id: miningId,
+            user_id: userid,
+            package_id: null,
+            amount: amount,
+            daily_reward: dailyYield,
+            total_earned: 0,
+            status: 'active',
+            start_date: new Date(),
+            timestamp: Date.now(),
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+
+        const created = await db.createMining(miningRecord);
+
+        // Log and respond in legacy shape
+        console.log('[legacy /api/Mine/setmineorder] Order created:', { userid, amount, dailyYield, miningId });
+        return res.json({ code: 1, data: {
+            orderId: created ? (created.id || created._id) : miningId,
+            amount: amount,
+            currency: 'ETH',
+            dailyYield: (dailyYield * 100) + '%',
+            status: 'active',
+            newBalance: newBalances.eth,
+            message: 'Mining started successfully. Daily rewards will be added automatically.'
+        }});
+    } catch (e) {
+        console.error('[legacy /api/Mine/setmineorder] error:', e);
+        return res.status(500).json({ code: 0, data: 'Failed to create mining order: ' + String(e && e.message ? e.message : e) });
+    }
+});
+
+// Legacy: POST /api/Mine/shuhui - mark redeeming
+router.post(['/api/Mine/shuhui','/api/mine/shuhui'], async (req, res) => {
+    try {
+        const body = req.body || {};
+        const id = body.id || body.orderId || body.orderID;
+        const userid = body.userid || body.user_id || body.uid;
+        if (!id || !userid) return res.status(400).json({ code: 0, data: 'Missing id or userid' });
+
+        const MiningModel = require('../models/Mining');
+        const mongoose = require('mongoose');
+        const query = { $or: [{ id: id }] };
+        if (mongoose.Types.ObjectId.isValid(id)) query.$or.push({ _id: id });
+
+        const rec = await MiningModel.findOneAndUpdate(query, { status: 'redeeming', updated_at: new Date() }, { new: true });
+        if (!rec) return res.status(404).json({ code: 0, data: 'Record not found' });
+
+        return res.json({ code: 1, data: 'Redeem request submitted' });
+    } catch (e) {
+        console.error('[legacy /api/Mine/shuhui] error:', e);
+        return res.status(500).json({ code: 0, data: String(e && e.message ? e.message : e) });
+    }
+});
+
 router.get('/api/mining/:userId', async (req, res) => {
     try {
         const records = await db.getUserMiningRecords(req.params.userId);
@@ -1032,6 +1224,118 @@ router.put('/api/mining/:miningId/claim', async (req, res) => {
         res.json(updated);
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/mining-records - Get all mining records for admin dashboard
+router.get('/api/admin/mining-records', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const limit = parseInt(req.query.limit) || 100;
+        const skip = parseInt(req.query.skip) || 0;
+        const Mining = require('../models/Mining');
+        
+        const records = await Mining.find({})
+            .limit(limit)
+            .skip(skip)
+            .sort({ created_at: -1 });
+
+        // Format in legacy shape for admin page
+        const formatted = (records || []).map(r => ({
+            orderId: r.id || r._id || '',
+            userid: r.user_id || '',
+            amount: Number(r.amount) || 0,
+            currency: r.currency || 'ETH',
+            totalIncome: Number(r.total_earned) || 0,
+            todayIncome: (Number(r.daily_reward) || 0) * (Number(r.amount) || 0),
+            status: r.status || 'active',
+            startDate: r.start_date ? new Date(r.start_date).toISOString() : (r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString())
+        }));
+
+        return res.json({ code: 1, data: formatted });
+    } catch (e) {
+        console.error('[admin/mining-records] error:', e);
+        return res.status(500).json({ code: 0, data: 'Failed to read mining records', error: e.message });
+    }
+});
+
+// POST /api/admin/mine/redeem/complete - Complete redeem for a mining record
+router.post('/api/admin/mine/redeem/complete', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const id = req.body.id || req.body.orderId;
+        if (!id) return res.status(400).json({ code: 0, data: 'Missing id' });
+
+        const Mining = require('../models/Mining');
+        const mongoose = require('mongoose');
+        const query = { $or: [{ id: id }] };
+        if (mongoose.Types.ObjectId.isValid(id)) query.$or.push({ _id: id });
+
+        const record = await Mining.findOne(query);
+        if (!record) return res.status(404).json({ code: 0, data: 'Record not found' });
+
+        if (record.status === 'completed' || record.status === 'redeemed') {
+            return res.json({ code: 1, data: 'Already redeemed' });
+        }
+
+        // Credit user's balance with staked amount
+        const User = require('../models/User');
+        const stakedAmount = Number(record.amount) || 0;
+        const coinKey = 'balances.eth';
+
+        const updatedUser = await User.findOneAndUpdate(
+            { $or: [{ userid: record.user_id }, { uid: record.user_id }, { id: record.user_id }] },
+            { $inc: { [coinKey]: stakedAmount }, $set: { updated_at: new Date() } },
+            { new: true }
+        );
+
+        if (updatedUser) {
+            console.log(`[admin/mine/redeem/complete] Credited ${stakedAmount} ETH to user ${record.user_id}`);
+        }
+
+        // Mark record completed/redeemed
+        record.status = 'completed';
+        record.updated_at = new Date();
+        await record.save();
+
+        return res.json({ code: 1, data: 'Redeem completed' });
+    } catch (e) {
+        console.error('[admin/mine/redeem/complete] error:', e);
+        return res.status(500).json({ code: 0, data: 'Server error', error: e.message });
+    }
+});
+
+// POST /api/admin/mine/redeem/reject - Reject a redeem request for a mining record
+router.post('/api/admin/mine/redeem/reject', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const id = req.body.id || req.body.orderId;
+        if (!id) return res.status(400).json({ code: 0, data: 'Missing id' });
+
+        const Mining = require('../models/Mining');
+        const mongoose = require('mongoose');
+        const query = { $or: [{ id: id }] };
+        if (mongoose.Types.ObjectId.isValid(id)) query.$or.push({ _id: id });
+
+        const record = await Mining.findOne(query);
+        if (!record) return res.status(404).json({ code: 0, data: 'Record not found' });
+
+        // Reset status back to 'active' to allow another redeem request
+        record.status = 'active';
+        record.updated_at = new Date();
+        await record.save();
+
+        console.log(`[admin/mine/redeem/reject] Rejected redeem for mining record ${id}`);
+        return res.json({ code: 1, data: 'Redeem rejected' });
+    } catch (e) {
+        console.error('[admin/mine/redeem/reject] error:', e);
+        return res.status(500).json({ code: 0, data: 'Server error', error: e.message });
     }
 });
 
@@ -1066,6 +1370,88 @@ router.get('/api/loan/:userId', async (req, res) => {
         res.json(loans);
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// ADMIN: approve loan (POST) - /api/admin/loan/approve
+router.post('/api/admin/loan/approve', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const id = req.body.id || req.body.orderId || req.body.loan_id;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
+
+        const Loan = require('../models/Loan');
+
+        // Find by flexible fields (id, orderId, or _id when valid ObjectId)
+        const mongoose = require('mongoose');
+        const orQueries = [{ id: id }, { orderId: id }, { order_id: id }];
+        if (mongoose.Types.ObjectId.isValid(id)) orQueries.push({ _id: id });
+        let loan = await Loan.findOne({ $or: orQueries });
+        if (!loan) return res.status(404).json({ success: false, error: 'Loan record not found' });
+
+        // Update loan status
+        loan.status = 'approved';
+        loan.disbursed_date = new Date();
+        loan.updated_at = new Date();
+        await loan.save();
+
+        // Credit user's USDT balance
+        try {
+            const User = require('../models/User');
+            const coinKey = 'balances.usdt';
+            const amount = Number(loan.amount) || 0;
+
+            const updatedUser = await User.findOneAndUpdate(
+                { $or: [{ userid: loan.user_id }, { uid: loan.user_id }, { id: loan.user_id }] },
+                { $inc: { [coinKey]: amount }, $set: { updated_at: new Date() } },
+                { new: true }
+            );
+
+            if (!updatedUser) {
+                console.warn('[admin/loan/approve] User not found to credit balance:', loan.user_id);
+            } else {
+                console.log(`[admin/loan/approve] Credited ${amount} USDT to user ${loan.user_id}`);
+            }
+
+            // Create topup audit record
+            try { await db.createTopup({ id: `topup_${Date.now()}`, user_id: loan.user_id, coin: 'USDT', amount: amount, status: 'complete', timestamp: Date.now(), created_at: new Date(), updated_at: new Date() }); } catch(e){ console.warn('[admin/loan/approve] failed to create topup audit:', e && e.message); }
+        } catch (e) {
+            console.warn('[admin/loan/approve] error crediting user:', e && e.message);
+        }
+
+        return res.json({ success: true, code: 1, data: loan });
+    } catch (e) {
+        console.error('[admin/loan/approve] error:', e);
+        return res.status(500).json({ success: false, error: String(e && e.message ? e.message : e) });
+    }
+});
+
+// ADMIN: reject loan (POST) - /api/admin/loan/reject
+router.post('/api/admin/loan/reject', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const id = req.body.id || req.body.orderId || req.body.loan_id;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
+
+        const Loan = require('../models/Loan');
+        const mongoose = require('mongoose');
+        const orQueries = [{ id: id }, { orderId: id }, { order_id: id }];
+        if (mongoose.Types.ObjectId.isValid(id)) orQueries.push({ _id: id });
+        let loan = await Loan.findOne({ $or: orQueries });
+        if (!loan) return res.status(404).json({ success: false, error: 'Loan record not found' });
+
+        loan.status = 'rejected';
+        loan.updated_at = new Date();
+        await loan.save();
+
+        return res.json({ success: true, code: 1, data: loan });
+    } catch (e) {
+        console.error('[admin/loan/reject] error:', e);
+        return res.status(500).json({ success: false, error: String(e && e.message ? e.message : e) });
     }
 });
 
@@ -1778,6 +2164,159 @@ router.put('/api/notification/:notificationId/read', async (req, res) => {
         res.json(updated);
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// ================= Loan & Wallet image endpoints (DB-backed) =================
+
+// POST /api/Wallet/getloaned - return loan summary AND records for a user (DB-backed)
+router.post(['/api/Wallet/getloaned', '/api/wallet/getloaned'], async (req, res) => {
+    try {
+        const body = req.body || {};
+        const userid = body.userid || body.user_id;
+        if (!userid) return res.status(400).json({ code: 0, data: 'Missing userid' });
+
+        console.log('[api][Wallet/getloaned] Fetching loans for user:', userid);
+
+        // try to load user to get loan quota if present
+        const user = await db.getUserById(userid).catch(()=>null) || {};
+        const loanQuota = Number(user.loan_quota || user.loan_limit || (user.meta && user.meta.loan_quota) || 1000);
+        
+        console.log('[api][Wallet/getloaned] User found, quota:', loanQuota);
+
+        const loans = await db.getUserLoans(userid);
+        console.log('[api][Wallet/getloaned] Loans count:', loans ? loans.length : 0);
+        
+        const total_jine = (loans || []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const total_weihuan = (loans || []).reduce((s, r) => {
+            const st = (r.status || '').toLowerCase();
+            if (st === 'completed' || st === 'repaid' || st === 'redeemed' || st === 'returned') return s;
+            return s + (Number(r.amount) || 0);
+        }, 0);
+
+        console.log('[api][Wallet/getloaned] Totals - jine:', total_jine, 'weihuan:', total_weihuan);
+
+        // NEW: Return both summary stats AND actual loan records
+        const responseData = {
+            code: 1, 
+            data: { 
+                edu: loanQuota, 
+                total_jine, 
+                total_weihuan,
+                records: (loans || []).map(loan => ({
+                    id: loan.id || loan._id,
+                    user_id: loan.user_id || loan.userid,
+                    amount: Number(loan.amount) || 0,
+                    interest_rate: Number(loan.interest_rate) || Number(loan.lixi) || 0,
+                    duration_days: Number(loan.duration_days) || Number(loan.tianshu) || 0,
+                    total_repay: Number(loan.total_repay) || (Number(loan.amount) || 0) + (Number(loan.interest_rate) || 0),
+                    status: loan.status || 'pending',
+                    created_at: loan.created_at || loan.createdAt || new Date().toISOString(),
+                    updated_at: loan.updated_at || loan.updatedAt || new Date().toISOString()
+                }))
+            }
+        };
+        
+        console.log('[api][Wallet/getloaned] Sending response');
+        return res.json(responseData);
+    } catch (e) {
+        console.error('[api][Wallet/getloaned] error:', e && e.message);
+        console.error('[api][Wallet/getloaned] stack:', e && e.stack);
+        return res.status(500).json({ code: 0, data: 'Server error' });
+    }
+});
+
+// POST /api/Wallet/addloan - submit loan application (DB-backed)
+router.post(['/api/Wallet/addloan', '/api/wallet/addloan'], async (req, res) => {
+    try {
+        const body = req.body || {};
+        const userid = body.userid;
+        const username = body.username;
+        const shuliang = Number(body.shuliang) || 0;
+        const tianshu = parseInt(body.tianshu) || 0;
+        const lixi = Number(body.lixi) || 0;
+        const zfxx = body.zfxx || '';
+        const srzm = body.srzm || '';
+        const yhxx = body.yhxx || '';
+        const sfz = body.sfz || '';
+
+        if (!userid || !username || !shuliang || !tianshu) return res.status(400).json({ code: 0, data: 'Missing required fields' });
+
+        const loanData = {
+            id: `loan_${Date.now()}`,
+            user_id: userid,
+            amount: shuliang,
+            interest_rate: lixi || 0,
+            duration_days: tianshu,
+            total_repay: Number(shuliang) + Number(lixi) || 0,
+            status: 'pending',
+            disbursed_date: null,
+            due_date: null,
+            repay_date: null,
+            timestamp: Date.now(),
+            created_at: new Date(),
+            updated_at: new Date(),
+            meta: { images: { zfxx, srzm, yhxx, sfz }, username }
+        };
+
+        const created = await db.createLoan(loanData);
+        if (!created) return res.status(500).json({ code: 0, data: 'Failed to create loan' });
+        return res.json({ code: 1, data: 'Application submitted', loan: created });
+    } catch (e) {
+        console.error('[api][Wallet/addloan] error:', e && e.message);
+        return res.status(500).json({ code: 0, data: 'Server error' });
+    }
+});
+
+// POST /api/Wallet/upload_image - accept multipart/form-data without adding multer
+router.post(['/api/Wallet/upload_image', '/api/wallet/upload_image'], (req, res) => {
+    try {
+        const chunks = [];
+        req.on('data', c => chunks.push(c));
+        req.on('end', () => {
+            try {
+                if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+                const contentType = (req.headers['content-type'] || '').toString();
+                const buffer = Buffer.concat(chunks || []);
+                let fileBuffer = buffer;
+                let ext = '.png';
+
+                if (contentType.indexOf('multipart/form-data') !== -1) {
+                    const m = contentType.match(/boundary=(.*)$/);
+                    const boundary = m ? ('--' + m[1]) : null;
+                    if (boundary) {
+                        const startIdx = buffer.indexOf(Buffer.from('\r\n\r\n'));
+                        if (startIdx !== -1) {
+                            const fileStart = startIdx + 4;
+                            const boundaryBuf = Buffer.from('\r\n' + boundary);
+                            const endIdx = buffer.indexOf(boundaryBuf, fileStart);
+                            const fileEnd = endIdx !== -1 ? endIdx : buffer.length;
+                            fileBuffer = buffer.slice(fileStart, fileEnd);
+                        }
+                        const headerPart = buffer.slice(0, startIdx > -1 ? startIdx : 0).toString();
+                        const ctMatch = headerPart.match(/Content-Type:\s*([^\r\n]+)/i);
+                        if (ctMatch) {
+                            const mime = ctMatch[1].trim().toLowerCase();
+                            if (mime.includes('png')) ext = '.png';
+                            else if (mime.includes('jpeg') || mime.includes('jpg')) ext = '.jpg';
+                            else if (mime.includes('gif')) ext = '.gif';
+                        }
+                    }
+                }
+
+                const filename = 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + ext;
+                const uploadPath = path.join(UPLOADS_DIR, filename);
+                fs.writeFileSync(uploadPath, fileBuffer);
+                const fileUrl = '/uploads/' + filename;
+                return res.json({ code: 1, data: fileUrl, message: 'Image uploaded successfully' });
+            } catch (err) {
+                console.error('[api][Wallet/upload_image] error:', err && err.message);
+                return res.status(500).json({ code: 0, data: err.message });
+            }
+        });
+    } catch (e) {
+        console.error('[api][Wallet/upload_image] outer error:', e && e.message);
+        return res.status(500).json({ code: 0, data: 'Server error' });
     }
 });
 

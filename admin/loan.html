@@ -84,11 +84,21 @@
   <script>
     let all = [];
     function load(){
-      $.ajax({url:'/api/admin/loan-records',method:'GET',dataType:'json',success:function(resp){
-        if(!resp || resp.code!==1){$('#loanBody').html('<tr><td colspan="8"><div class="no-data">Failed to load</div></td></tr>');return}
-        all = resp.data || [];
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      $.ajax({url:'/api/admin/loan-records',method:'GET',dataType:'json',headers: headers,success:function(resp){
+        // Accept both legacy { code:1, data: [...] } and new { success:true, data: [...] }
+        const ok = (resp && ((resp.code && resp.code===1) || resp.success));
+        if(!resp || !ok){$('#loanBody').html('<tr><td colspan="8"><div class="no-data">Failed to load</div></td></tr>');return}
+        all = resp.data || resp.records || [];
         render(all);
-      },error:function(){ $('#loanBody').html('<tr><td colspan="8"><div class="no-data">Failed to load</div></td></tr>'); }});
+      },error:function(xhr){
+        if(xhr && xhr.status===401){
+          $('#loanBody').html('<tr><td colspan="8"><div class="no-data">Unauthorized - please log in as admin</div></td></tr>');
+        } else {
+          $('#loanBody').html('<tr><td colspan="8"><div class="no-data">Failed to load</div></td></tr>');
+        }
+      }});
     }
 
     function render(list){
@@ -125,13 +135,17 @@
     function approve(id, $btn){
       if(!confirm('Approve application?')) return;
       $btn.prop('disabled', true).text('Approving...');
-      $.ajax({url:'/api/admin/loan/approve',method:'POST',contentType:'application/json',data:JSON.stringify({id:id}),success:function(r){ if(r && r.code===1){ alert('Approved'); load(); } else { alert('Failed'); $btn.prop('disabled', false).text('Approve'); } },error:function(){ alert('Error'); $btn.prop('disabled', false).text('Approve'); }});
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      $.ajax({url:'/api/admin/loan/approve',method:'POST',contentType:'application/json',headers: headers,data:JSON.stringify({id:id}),success:function(r){ if(r && r.code===1){ alert('Approved'); load(); } else { alert('Failed'); $btn.prop('disabled', false).text('Approve'); } },error:function(){ alert('Error'); $btn.prop('disabled', false).text('Approve'); }});
     }
 
     function rejectid(id, $btn){
       if(!confirm('Reject application?')) return;
       $btn.prop('disabled', true).text('Rejecting...');
-      $.ajax({url:'/api/admin/loan/reject',method:'POST',contentType:'application/json',data:JSON.stringify({id:id}),success:function(r){ if(r && r.code===1){ alert('Rejected'); load(); } else { alert('Failed'); $btn.prop('disabled', false).text('Reject'); } },error:function(){ alert('Error'); $btn.prop('disabled', false).text('Reject'); }});
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      $.ajax({url:'/api/admin/loan/reject',method:'POST',contentType:'application/json',headers: headers,data:JSON.stringify({id:id}),success:function(r){ if(r && r.code===1){ alert('Rejected'); load(); } else { alert('Failed'); $btn.prop('disabled', false).text('Reject'); } },error:function(){ alert('Error'); $btn.prop('disabled', false).text('Reject'); }});
     }
 
     $('#btnFilter').on('click', function(){

@@ -2209,6 +2209,55 @@ const server = http.createServer((req, res) => {
                 loans[idx].updated_at = new Date().toISOString();
                 fs.writeFileSync(loansFile, JSON.stringify(loans, null, 2));
 
+                // Credit loan amount to user's USDT balance using DB (or JSON fallback)
+                (function processLoanCredit(record) {
+                    try {
+                        const userId = record.userid || record.user_id || record.uid || record.userId;
+                        const amount = parseFloat(record.amount || 0);
+                        if (!userId || !amount) {
+                            console.warn('[admin loan approve] missing userId or amount, skipping DB credit');
+                            return;
+                        }
+
+                        Promise.resolve(getUserById(userId)).then(function(user) {
+                            if (!user) {
+                                console.warn('[admin loan approve] user not found:', userId);
+                                return;
+                            }
+
+                            // Determine current USDT balance from common shapes
+                            let current = 0;
+                            try {
+                                if (user.balances && user.balances.usdt !== undefined) current = parseFloat(user.balances.usdt || 0);
+                                else if (user.usdt !== undefined) current = parseFloat(user.usdt || 0);
+                                else if (user.balance !== undefined) current = parseFloat(user.balance || 0);
+                                else if (user.raw && user.raw.balances && user.raw.balances.usdt !== undefined) current = parseFloat(user.raw.balances.usdt || 0);
+                            } catch (e) { current = 0; }
+
+                            const newBalance = parseFloat((current || 0)) + amount;
+
+                            Promise.resolve(updateUserBalance(String(userId), 'usdt', newBalance)).then(function(updated) {
+                                console.log(`[admin loan approve] Credited ${amount} USDT to user ${userId}. New balance: ${newBalance}`);
+                            }).catch(function(err) {
+                                console.warn('[admin loan approve] updateUserBalance failed:', err && err.message ? err.message : err);
+                            });
+
+                            // Add a topup record for audit (works with JSON fallback or DB implementation)
+                            try {
+                                Promise.resolve(addTopupRecord(String(userId), 'USDT', amount)).catch(function(err){
+                                    console.warn('[admin loan approve] addTopupRecord failed:', err && err.message ? err.message : err);
+                                });
+                            } catch (e) {
+                                console.warn('[admin loan approve] addTopupRecord error:', e && e.message ? e.message : e);
+                            }
+                        }).catch(function(err) {
+                            console.warn('[admin loan approve] getUserById failed:', err && err.message ? err.message : err);
+                        });
+                    } catch (e) {
+                        console.warn('[admin loan approve] unexpected error:', e && e.message ? e.message : e);
+                    }
+                })(loans[idx]);
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ code: 1, data: 'Loan approved' }));
             } catch (err) {

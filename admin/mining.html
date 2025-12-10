@@ -99,7 +99,9 @@
     const recordsPerPage = 10;
 
     function loadMiningRecords(){
-      $.ajax({url:'/api/admin/mining-records',method:'GET',dataType:'json',success:function(resp){
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      $.ajax({url:'/api/admin/mining-records',method:'GET',dataType:'json',headers:headers,success:function(resp){
         if(!resp || resp.code!==1){$('#miningBody').html('<tr><td colspan="8"><div class="no-data">Failed to load mining records</div></td></tr>');return}
         allRecords = resp.data || [];
         // Create deterministic sequential display IDs: Mining-000000
@@ -186,10 +188,13 @@
     function approveRedeem(orderId, $btn){
       if(!confirm('Approve redeem for '+orderId+'?')) return;
       $btn.prop('disabled', true).text('Approving...');
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       $.ajax({
         url: '/api/admin/mine/redeem/complete',
         method: 'POST',
         contentType: 'application/json',
+        headers: headers,
         data: JSON.stringify({ id: orderId }),
         success: function(resp){
           if(resp && resp.code===1){
@@ -210,10 +215,13 @@
     function rejectMining(orderId, $btn){
       if(!confirm('Reject redeem for '+orderId+'?')) return;
       $btn.prop('disabled', true).text('Rejecting...');
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       $.ajax({
         url: '/api/admin/mine/redeem/reject',
         method: 'POST',
         contentType: 'application/json',
+        headers: headers,
         data: JSON.stringify({ id: orderId }),
         success: function(resp){
           if(resp && resp.code===1){

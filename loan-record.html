@@ -288,6 +288,59 @@
             const userId = Cookies.get('userid'); // ????ID
 
 
+            // Render helper: accepts an array of loan objects and appends to .y-re-in
+            function renderLoans(loans) {
+                loans.forEach(data => {
+                    const statusText = data.status === 'approved' ? 'Approved' : data.status === 'pending' ? 'Pending' : 'Rejected';
+                    const statusClass = data.status === 'approved' ? 'approved' : data.status === 'pending' ? 'pending' : 'rejected';
+                    const createdDate = new Date(data.created_at || data.createdAt || Date.now()).toLocaleDateString('en-US');
+
+                    const interest = data.interest || data.interest_rate || data.rate || 0;
+                    const days = data.days || data.duration_days || data.duration || 0;
+                    const totalReturn = parseFloat(data.amount || 0) + (parseFloat(data.amount || 0) * parseFloat(interest || 0) / 100);
+
+                    const notificationHTML = `
+                        <div class="y-re-box">
+                            <span class="status-badge ${statusClass}">
+                                ${statusText}
+                            </span>
+                            <div class="y-re-bl">
+                                <img src="/img/coin/usdt.png" alt="Loan">
+                            </div>
+                            <div class="y-re-blr">
+                                <div class="amount-row">
+                                    <div class="amount-display">${data.amount} USDT</div>
+                                    <div class="amount-label">Loan Amount</div>
+                                </div>
+
+                                <div class="y-re-bim">
+                                    <p>
+                                        <strong>Duration</strong>
+                                        <span>${days} days</span>
+                                    </p>
+                                    <p>
+                                        <strong>Interest</strong>
+                                        <span>${interest}%</span>
+                                    </p>
+                                    <p>
+                                        <strong>Total Return</strong>
+                                        <span class="return-value">${totalReturn.toFixed(2)} USDT</span>
+                                    </p>
+                                    <p></p>
+                                </div>
+
+                                <div class="y-sfyidu y-sfyidu2">
+                                    <p>Submitted: ${createdDate}</p>
+                                    ${data.status === 'approved' && data.updated_at ? `<p>Approved: ${new Date(data.updated_at).toLocaleDateString('en-US')}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    $('.y-re-in').append(notificationHTML);
+                });
+            }
+
             $(document).ready(function() {
                 loadMore();
 
@@ -315,76 +368,33 @@
                     dataType: 'json',
                     success: function(res) {
                         if (res.code === 1) {
-                            // Get full loan records from admin endpoint or use summary
-                            // For now, fetch all loan records
-                            $.ajax({
-                                url: apiurl + '/admin/loan-records',
-                                type: 'GET',
-                                dataType: 'json',
-                                success: function(adminRes) {
-                                    if (adminRes.code === 1 && adminRes.data && adminRes.data.length > 0) {
-                                        // Filter records for current user
-                                        const userLoans = adminRes.data.filter(l => String(l.userid) === String(userid));
+                            // NEW: Extract loan records from res.data.records (new format)
+                            // FALLBACK: Handle old format where res.data was an array
+                            let userLoans = [];
+                            
+                            if (res.data && res.data.records && Array.isArray(res.data.records)) {
+                                // New format: res.data.records contains loan array
+                                userLoans = res.data.records;
+                            } else if (Array.isArray(res.data)) {
+                                // Old format: res.data is an array
+                                userLoans = res.data;
+                            } else if (res.loans && Array.isArray(res.loans)) {
+                                // Alternative format
+                                userLoans = res.loans;
+                            }
 
-                                        if (userLoans.length === 0) {
-                                            $('.y-re-load').text('No records found').prop('disabled', true);
-                                            return;
-                                        }
+                            if (userLoans.length === 0) {
+                                $('.y-re-load').text('No records found').prop('disabled', true);
+                                return;
+                            }
 
-                                        // Render loan records
-                                        userLoans.forEach(data => {
-                                            const statusText = data.status === 'approved' ? 'Approved' : data.status === 'pending' ? 'Pending' : 'Rejected';
-                                            const statusClass = data.status === 'approved' ? 'approved' : data.status === 'pending' ? 'pending' : 'rejected';
-                                            const createdDate = new Date(data.created_at).toLocaleDateString('en-US');
-
-                                            const totalReturn = parseFloat(data.amount) + (parseFloat(data.amount) * parseFloat(data.interest) / 100);
-                                            const notificationHTML = `
-                                                <div class="y-re-box">
-                                                    <span class="status-badge ${statusClass}">
-                                                        ${statusText}
-                                                    </span>
-                                                    <div class="y-re-bl">
-                                                        <img src="/img/coin/usdt.png" alt="Loan">
-                                                    </div>
-                                                    <div class="y-re-blr">
-                                                        <div class="amount-row">
-                                                            <div class="amount-display">${data.amount} USDT</div>
-                                                            <div class="amount-label">Loan Amount</div>
-                                                        </div>
-
-                                                        <div class="y-re-bim">
-                                                            <p>
-                                                                <strong>Duration</strong>
-                                                                <span>${data.days} days</span>
-                                                            </p>
-                                                            <p>
-                                                                <strong>Interest</strong>
-                                                                <span>${data.interest}%</span>
-                                                            </p>
-                                                            <p>
-                                                                <strong>Total Return</strong>
-                                                                <span class="return-value">${totalReturn.toFixed(2)} USDT</span>
-                                                            </p>
-                                                            <p></p>
-                                                        </div>
-
-                                                        <div class="y-sfyidu y-sfyidu2">
-                                                            <p>Submitted: ${createdDate}</p>
-                                                            ${data.status === 'approved' && data.updated_at ? `<p>Approved: ${new Date(data.updated_at).toLocaleDateString('en-US')}</p>` : ''}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            `;
-
-                                            $('.y-re-in').append(notificationHTML);
-                                        });
-
-                                        // ????
-                                        page += 1;
-                                    }
-                                }
-                            });
+                            renderLoans(userLoans);
+                            page += 1;
                         }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Failed to load loans:', status, error);
+                        $('.y-re-load').text('Failed to load records').prop('disabled', true);
                     }
                 });
             }
