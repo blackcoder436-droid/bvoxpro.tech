@@ -206,6 +206,34 @@ router.post('/api/admin/update-profile', async (req, res) => {
     }
 });
 
+// Public admin info (telegram + wallets) - GET /api/public/admin-info
+router.get('/api/public/admin-info', async (req, res) => {
+    try {
+        console.log('[public-admin-info] Request received from', req.ip || req.connection.remoteAddress);
+        // Use DB helper which is resilient (returns [] on error)
+        const admins = await db.getAllAdmins(50).catch(() => []);
+
+        if (!admins || admins.length === 0) {
+            return res.json({ success: true, telegram: '', wallets: {} });
+        }
+
+        // Prefer an admin that has public info (telegram or wallets). If none, prefer an active admin, otherwise first.
+        let admin = admins.find(a => a && ( (a.telegram && String(a.telegram).trim() !== '') || (a.wallets && typeof a.wallets === 'object' && Object.values(a.wallets).some(v => v && String(v).trim() !== '')) ))
+                    || admins.find(a => a && a.status === 'active')
+                    || admins[0];
+
+        const publicInfo = {
+            telegram: (admin && admin.telegram) ? String(admin.telegram) : '',
+            wallets: (admin && admin.wallets && typeof admin.wallets === 'object') ? admin.wallets : {}
+        };
+
+        res.json({ success: true, ...publicInfo });
+    } catch (e) {
+        console.error('[public-admin-info] Error:', e && e.message);
+        res.status(500).json({ success: false, telegram: '', wallets: {} });
+    }
+});
+
 // GET /api/admin/users - returns users list for admin pages
 router.get('/api/admin/users', async (req, res) => {
     try {

@@ -45,7 +45,7 @@
             <div class="y-kf-bottom">
                 <a href="https://t.me/BVOXTech_Support" class="y-kf-bbox" id="telegramLink">
                     <img src="./assets/img/telegram.jpg">
-                    <span>Telegram</span>
+                    <span id="telegramLinkText">Telegram</span>
                 </a>
                 <!-- <a href="https://wa.me/14754477277" class="y-kf-bbox">
                     <img src="/img/whatsapp.jpg"/>
@@ -60,19 +60,26 @@
             
         </script>
     <script defer="" src="./assets/js/cloudflare-analytics.js" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon="{&quot;version&quot;:&quot;2024.11.0&quot;,&quot;token&quot;:&quot;eeb085316a57431db0b1a080d3a6bf6e&quot;,&quot;r&quot;:1,&quot;server_timing&quot;:{&quot;name&quot;:{&quot;cfCacheStatus&quot;:true,&quot;cfEdge&quot;:true,&quot;cfExtPri&quot;:true,&quot;cfL4&quot;:true,&quot;cfOrigin&quot;:true,&quot;cfSpeedBrain&quot;:true},&quot;location_startswith&quot;:null}}" crossorigin="anonymous"></script>
+            <script>
             // Fetch public admin info to update Telegram link dynamically
             (function(){
                 fetch('/api/public/admin-info').then(r=>r.json()).then(data=>{
-                    if(data && data.success && data.telegram){
-                        const link = document.getElementById('telegramLink');
-                        if(link){
-                            // sanitize username (strip leading @ if present)
-                            const user = String(data.telegram).replace(/^@/, '').trim();
-                            link.href = 'https://t.me/' + encodeURIComponent(user);
+                    try{
+                        if(data && data.success && data.telegram){
+                            const link = document.getElementById('telegramLink');
+                            const text = document.getElementById('telegramLinkText');
+                            if(link){
+                                // Normalize username and create t.me URL
+                                const raw = String(data.telegram).trim();
+                                const username = raw.replace(/^https?:\/\/(t\.me\/)?/, '').replace(/^@/, '').replace(/\/?$/, '').trim();
+                                link.href = 'https://t.me/' + encodeURIComponent(username);
+                                // keep visible label as the generic "Telegram" per request
+                            }
                         }
-                    }
+                    }catch(e){ console.warn('Could not apply admin info', e); }
                 }).catch(e=>{ console.warn('Could not load admin info', e); });
             })();
+            </script>
 
 
 	<script src="./assets/js/walletAuth.js" type="text/javascript" charset="utf-8"></script>

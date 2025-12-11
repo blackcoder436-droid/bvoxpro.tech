@@ -251,6 +251,18 @@ module.exports = {
                         { $set: safeUpdates },
                         { new: true }
                     );
+                    // Also persist a lightweight public JSON for fast client reads (fallback)
+                    try {
+                        const publicPath = path.join(__dirname, '..', 'public_admin_info.json');
+                        const publicObj = {
+                            telegram: updatedAdmin.telegram || '',
+                            wallets: (updatedAdmin.wallets && typeof updatedAdmin.wallets === 'object') ? updatedAdmin.wallets : {}
+                        };
+                        fs.writeFileSync(publicPath, JSON.stringify(publicObj, null, 2));
+                        console.log('[authModel] public_admin_info.json written');
+                    } catch (e) {
+                        console.warn('[authModel] failed to write public_admin_info.json', e && e.message);
+                    }
                     console.log('[authModel] updateAdminProfile saved to MongoDB:', adminId);
                     return updatedAdmin;
                 } catch (e) {

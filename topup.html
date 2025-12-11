@@ -102,28 +102,27 @@
                 // Update title
                 try { $('.y-tu-tit').text(key.toUpperCase()); } catch (e) { console.error('Title update failed', e); }
 
-                // Update QR image with cache-busting
-                var qr = qrMap[key] || './assets/img/usdt_qr.png';
-                var cacheBuster = '?v=' + Date.now();
-                console.log('?? Setting QR to:', qr + cacheBuster);
-
-                // Use vanilla JS to set the image
-                const imgElement = document.getElementById('y-bitu');
-                if (imgElement) {
-                    imgElement.src = qr + cacheBuster;
-                    imgElement.style.display = 'block';
-                    imgElement.style.opacity = '1';
-                    imgElement.style.visibility = 'visible';
-                    console.log('? Image src set, visible:', imgElement.offsetParent !== null);
-                }
-
-                // Also set via jQuery for safety
-                $('#y-bitu').attr('src', qr + cacheBuster).show();
-
                 // Update wallet address
                 var addr = addrMap[key] || 'N/A';
                 console.log('?? Setting address to:', addr);
                 try { $('#y-bilian').text(addr); } catch (e) { console.error('Address update failed', e); }
+
+                // Generate dynamic QR for the exact address so scans match the displayed address
+                // Use a public QR generator (api.qrserver.com). Size chosen 300x300 for clarity.
+                try {
+                    var qrData = encodeURIComponent(addr);
+                    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + qrData;
+                    // cache-bust to ensure updates take effect immediately
+                    qrUrl += '&t=' + Date.now();
+                    $('#y-bitu').attr('src', qrUrl).show();
+                } catch (e) {
+                    // Fallback to static image if anything goes wrong
+                    var fallback = (qrMap[key] || './assets/img/usdt_qr.png') + '?v=' + Date.now();
+                    console.warn('Dynamic QR generation failed, using fallback', e);
+                    $('#y-bitu').attr('src', fallback).show();
+                }
+
+                // Admin telegram display intentionally omitted on topup page; only address and QR are shown.
             }
 
             // Fallback copy function for older browsers
@@ -226,6 +225,8 @@
                 console.log('?? Page loaded, initializing QR and address...');
                 // Fetch admin-provided wallets and merge into addrMap so updated addresses show to users
                 fetch('/api/public/admin-info').then(r=>r.json()).then(pub=>{
+                    // store admin telegram for later display
+                    try { window.__adminTelegram = (pub && pub.telegram) ? String(pub.telegram) : ''; } catch(e) { window.__adminTelegram = ''; }
                     if(pub && pub.success && pub.wallets && typeof pub.wallets === 'object'){
                         try{
                             const w = pub.wallets;
