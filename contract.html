@@ -6,6 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/contract.css">
 		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+		<script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
 		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<script>
 			// Pre-configure layer.js path before it loads
@@ -32,7 +33,7 @@
 				   <a href="index.html" class="y-fanhui">
 					   <img src="./assets/img/fanhui.png">
 				   </a>
-				   <div class="y-title" data-translate="??">Contract</div>
+				   <div class="y-title" data-translate="Contract">Contract</div>
 				  
 				   <a href="contract-record.html" class="yy-tr">
 					   <img src="./assets/img/ls.png">
@@ -125,27 +126,27 @@
 
 		<div class="y-gongneng">
 			<div class="y-tfx-t">
-				<span data-translate="??">Function</span>
+				<span data-translate="Function">Function</span>
 			</div>
 			
 			<div class="y-tfx-tit">
 				<div>
-					<span data-translate="??" class="y-tfx y-tfx-left">Time</span>
+					<span data-translate="Time" class="y-tfx y-tfx-left">Time</span>
 				</div>
 				<div>
-					<span data-translate="??" class="y-tfx y-tfx-right">Direction</span>
+					<span data-translate="Direction" class="y-tfx y-tfx-right">Direction</span>
 				</div>
 				<div>
-					<span data-translate="??" class="y-tfx y-tfx-left">Price</span>
+					<span data-translate="Price" class="y-tfx y-tfx-left">Price</span>
 				</div>
 				<div>
-					<span data-translate="??" class="y-tfx y-tfx-right">Quantity</span>
+					<span data-translate="Quantity" class="y-tfx y-tfx-right">Quantity</span>
 				</div>
 			</div>
 			<div id="tradbox"><div class="y-tfx y-tfx-left">08:11:26</div><div class="y-tfx y-tfx-right y-shang y-tfx-b1">Upward</div><div class="y-tfx y-tfx-left y-tfx-b2">90900.3600</div><div class="y-tfx y-tfx-right">0.0005</div><div class="y-tfx y-tfx-left">08:11:09</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90900.3500</div><div class="y-tfx y-tfx-right">0.0025</div><div class="y-tfx y-tfx-left">08:10:57</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90912.6500</div><div class="y-tfx y-tfx-right">0.0167</div><div class="y-tfx y-tfx-left">08:10:50</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90925.2400</div><div class="y-tfx y-tfx-right">0.0001</div><div class="y-tfx y-tfx-left">08:10:50</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90925.2400</div><div class="y-tfx y-tfx-right">0.0010</div><div class="y-tfx y-tfx-left">08:10:49</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90927.0300</div><div class="y-tfx y-tfx-right">0.0499</div><div class="y-tfx y-tfx-left">08:10:49</div><div class="y-tfx y-tfx-right y-shang y-tfx-b1">Upward</div><div class="y-tfx y-tfx-left y-tfx-b2">90927.0400</div><div class="y-tfx y-tfx-right">0.0018</div><div class="y-tfx y-tfx-left">08:10:49</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90930.9400</div><div class="y-tfx y-tfx-right">0.0030</div><div class="y-tfx y-tfx-left">08:10:49</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90930.9400</div><div class="y-tfx y-tfx-right">0.0006</div><div class="y-tfx y-tfx-left">08:10:40</div><div class="y-tfx y-tfx-right y-xia y-tfx-b1">Down</div><div class="y-tfx y-tfx-left y-tfx-b2">90917.3500</div><div class="y-tfx y-tfx-right">1.4326</div><div style="clear:both"></div></div>
 		</div>
 		<div class="y-tfx-button" id="y-xia">
-			<div data-translate="????">Immediate entrustment</div>
+			<div data-translate="Immediate entrustment">Immediate entrustment</div>
 		</div>
 
 		<div class="y-xdan" id="y-xdan">
@@ -158,9 +159,9 @@
 						<div class="y-xdan-tl-txt">
 							<span class="y-xdan-tl-txt-top">BTC</span>
 							<div class="y-xdan-tl-txt-bottom">
-								<span data-translate="??">Buy</span>
+								<span data-translate="Buy">Buy</span>
 								<span> </span>
-								<span data-translate="??" id="y-gmkdfx">Upward</span>
+								<span data-translate="Upward" id="y-gmkdfx">Upward</span>
 							</div>
 						</div>
 					</div>
@@ -176,15 +177,15 @@
 				</div>
 				<div class="y-xdan-sx">
 					<div class="y-xdan-sx-left y-xdan-xzl" onclick="fx(1)">
-						<span data-translate="??">Upward</span>
+						<span data-translate="Upward">Upward</span>
 					</div>
 					<div class="y-xdan-sx-right" onclick="fx(2)">
-						<span data-translate="??">Down</span>
+						<span data-translate="Down">Down</span>
 					</div>
 				</div>
 				<div class="y-xdan-ss">
 					<div class="y-xdan-ss-tit">
-						<span data-translate="????">Delivery time</span>
+						<span data-translate="Delivery time">Delivery time</span>
 						<img src="./assets/img/time.png">
 					</div>
 					<div class="y-xdan-ss-bo">
@@ -235,12 +236,12 @@
 					</div>
 				</div>
 				<div class="y-xdan-jg-tit">
-					<span data-translate="????">Purchase Price</span>
+					<span data-translate="Purchase Price">Purchase Price</span>
 				</div>
 				<div class="y-xdan-num">
 					<div class="y-xdan-num-left">
 						<img src="./assets/img/usdt.png">
-						<span data-translate="??">Quantity</span>
+						<span data-translate="Quantity">Quantity</span>
 					</div>
 					<div class="y-xdan-num-right">
 						<input type="number" id="y-buynum">
@@ -249,17 +250,17 @@
 				</div>
 				<div class="y-xdan-fy">
 					<div class="y-xdan-fy-left">
-						<span data-translate="???">Fees</span>
+						<span data-translate="Fees">Fees</span>
 						<span>:<b id="y-sxf">0</b></span>
 					</div>
 					<!--<div class="y-xdan-fy-right">-->
-					<!--	<span data-translate="??"></span>-->
+					<!--	<span data-translate="Available balance">Available balance</span>-->
 					<!--	<span>: <b id="yyyue">0</b></span>-->
 					<!--</div>-->
 				</div>
 			</div>
 			<div class="y-tfx-button" onclick="xdan()">
-				<div data-translate="????">Immediate entrustment</div>
+				<div data-translate="Immediate entrustment">Immediate entrustment</div>
 			</div>
 
 			<div class="y-djs" style="display: none;">
@@ -273,44 +274,44 @@
 					</div>
 				</div>
 				<div class="y-dangqian">
-					<span id="y-zzjg"><b data-translate="??" id="y-now">Now</b></span>
+					<span id="y-zzjg"><b data-translate="Now" id="y-now">Now</b></span>
 					<span id="y-ssjg">0.00</span>
 				</div>
-				<div class="y-load" style="display: none;">
-					<div class="y-loading"></div>
-					<span class="y-load-wen" data-translate="?????...">Funds settlement in progress...</span>
-				</div>
-				<div class="y-hyh" style="display: none;">
-					<span data-translate="???,?????????">Unfortunately, you lost this trade.</span>
-				</div>
+					<div class="y-load" style="display: none;">
+						<div class="y-loading"></div>
+						<span class="y-load-wen" data-translate="Funds settlement in progress...">Funds settlement in progress...</span>
+					</div>
+					<div class="y-hyh" style="display: none;">
+						<span data-translate="Unfortunately, you lost this trade.">Unfortunately, you lost this trade.</span>
+					</div>
 				<div class="y-hyy" style="display: none;">
 					<span class="y-hyy-top"></span>
-					<span class="y-hyy-bottom" data-translate="????????????">Your profit has been credited to your account.</span>
+					<span class="y-hyy-bottom" data-translate="Your profit has been credited to your account.">Your profit has been credited to your account.</span>
 				</div>
 				<div class="y-djs-z">
 					<div class="y-djs-zbox">
-						<span data-translate="???">Purchase price</span>
+						<span data-translate="Purchase price">Purchase price</span>
 						<span id="y-gmj"></span>
 					</div>
 					<div class="y-djs-zbox">
-						<span data-translate="????">Purchase quantity</span>
+						<span data-translate="Purchase quantity">Purchase quantity</span>
 						<span id="y-gmsl"></span>
 					</div>
 					<div class="y-djs-zbox">
-						<span data-translate="????">Purchase direction</span>
+						<span data-translate="Purchase direction">Purchase direction</span>
 						<span id="y-gmfx"></span>
 					</div>
 					<div class="y-djs-zbox">
-						<span data-translate="????">Contract duration</span>
+						<span data-translate="Contract duration">Contract duration</span>
 						<span id="y-hysc"></span>
 					</div>
 					<div class="y-djs-zbox">
-						<span data-translate="????">Matured Proceeds</span>
+						<span data-translate="Matured Proceeds">Matured Proceeds</span>
 						<span id="y-dqsy"></span>
 					</div>
 				</div>
 				<div class="y-mrj" style="display: none;">
-					<span data-translate="???">Purchase price</span>
+					<span data-translate="Purchase price">Purchase price</span>
 					<span>:</span>
 					<span id="y-gmj2"></span>
 				</div>
@@ -319,7 +320,7 @@
 		</div>
 
 		<div class="y-czxz y-czxz-co" style="display: none;">
-			<div class="y-wa-tit" data-translate="????">Select currency</div>
+			<div class="y-wa-tit" data-translate="Select currency">Select currency</div>
 
 			<a href="contract.html?market=btc" class="y-wa-box y-wa-box-co">
 				<div class="y-wa-bl">
@@ -516,6 +517,49 @@
 			var trade_list_timer; // token for tradelist interval
 		
 		function gettradlist(){
+
+		// Map server-returned labels (sometimes Chinese) to English for display
+		function mapServerLabel(s){
+			if(!s) return '';
+			try{ s = (s+'').trim(); }catch(e){ return s }
+
+			// remove Unicode replacement characters and control chars
+			s = s.replace(/\uFFFD/g,'').replace(/[\x00-\x1F\x7F]/g,'').trim();
+
+			// quick ASCII checks
+			if(/\b(up|upward|buy|buying)\b/i.test(s)) return 'Upward';
+			if(/\b(down|downward|sell|selling)\b/i.test(s)) return 'Down';
+
+			// detect Han characters (Chinese) and look for 上/下
+			try{
+				if(/[\p{Script=Han}]/u.test(s)){
+					if(/上/.test(s)) return 'Upward';
+					if(/下/.test(s)) return 'Down';
+					// sometimes second char is replacement; if string contains '向' assume direction
+					if(/向/.test(s)) return /下/.test(s) ? 'Down' : 'Upward';
+				}
+			}catch(e){}
+
+			// if result still unclear but contains '向' (common prefix for 上/下), assume Upward unless '下' appears
+			if(/向/.test(s)){
+				if(/下/.test(s)) return 'Down';
+				return 'Upward';
+			}
+
+			// strip digits and punctuation; then test residual for keywords
+			var cleaned = s.replace(/[0-9\s\-\+\.,:;%\\/\(\)\[\]<>\uFFFD]+/g,'').toLowerCase();
+			if(/up|buy/.test(cleaned)) return 'Upward';
+			if(/down|sell/.test(cleaned)) return 'Down';
+
+			// if label contains many replacement/mangled chars but also '上'/'下' bytes in escaped form
+			if(s.indexOf('%u4E0A') !== -1 || s.indexOf('%u4E0B') !== -1){
+				if(s.indexOf('%u4E0A') !== -1) return 'Upward';
+				if(s.indexOf('%u4E0B') !== -1) return 'Down';
+			}
+
+			// fallback to original trimmed string (so gy() can use it if present in i18n map)
+			return s || '';
+		}
 			
 
 			$.post(apiurl + "/Trade/gettradlist",{
@@ -532,18 +576,21 @@
 						
 					}else{
 						$.each(data.data,function(key,val){
-							if(val.strtype =="??"){
-								html += '<div class="y-tfx y-tfx-left">'+ val.ts +'</div>'+
-									'<div class="y-tfx y-tfx-right y-shang y-tfx-b1">'+ gy(val.strtype) +'</div>'+
-									'<div class="y-tfx y-tfx-left y-tfx-b2">' + val.price + '</div>'+
-									'<div class="y-tfx y-tfx-right">' + val.amount + '</div>';
-							}else{
-								html += '<div class="y-tfx y-tfx-left">'+ val.ts +'</div>'+
-									'<div class="y-tfx y-tfx-right y-xia y-tfx-b1">'+ gy(val.strtype) +'</div>'+
-									'<div class="y-tfx y-tfx-left y-tfx-b2">' + val.price + '</div>'+
-									'<div class="y-tfx y-tfx-right">' + val.amount + '</div>';
-							}
-						});
+								var serverLabel = val.strtype || '';
+								var mapped = mapServerLabel(serverLabel);
+								// decide up/down class by mapped label
+								if(mapped === 'Upward' || /upward|up|buy/i.test(mapped)){
+									html += '<div class="y-tfx y-tfx-left">'+ val.ts +'</div>'+
+										'<div class="y-tfx y-tfx-right y-shang y-tfx-b1">'+ gy(mapped) +'</div>'+
+										'<div class="y-tfx y-tfx-left y-tfx-b2">' + val.price + '</div>'+
+										'<div class="y-tfx y-tfx-right">' + val.amount + '</div>';
+								}else{
+									html += '<div class="y-tfx y-tfx-left">'+ val.ts +'</div>'+
+										'<div class="y-tfx y-tfx-right y-xia y-tfx-b1">'+ gy(mapped) +'</div>'+
+										'<div class="y-tfx y-tfx-left y-tfx-b2">' + val.price + '</div>'+
+										'<div class="y-tfx y-tfx-right">' + val.amount + '</div>';
+								}
+							});
 						html += "<div style='clear:both'></div>";
 						$("#tradbox").append(html);
 					}
@@ -577,7 +624,7 @@
 						coin_data = setTimestampInterval(getcoin_data,2000);
             
 			$("#y-xia").click(function() {
-			    $('#y-buynum').attr('placeholder', gy('?????'));
+				$('#y-buynum').attr('placeholder', gy('Please enter quantity'));
 				$("#y-xdan").slideToggle(50);
 				$("#y-zhe").show();
 				document.body.style.overflow = 'hidden';
@@ -611,11 +658,11 @@
 			if(fx==1){
 				$('.y-xdan-sx-right').removeClass('y-xdan-xzl');
 				$('.y-xdan-sx-left').addClass('y-xdan-xzl');
-				$('#y-gmkdfx').text(gy('??'));
+				$('#y-gmkdfx').text(gy('Upward'));
 			}else if(fx==2){
 				$('.y-xdan-sx-left').removeClass('y-xdan-xzl');
 				$('.y-xdan-sx-right').addClass('y-xdan-xzl');
-				$('#y-gmkdfx').text(gy('??'));
+				$('#y-gmkdfx').text(gy('Down'));
 			}
 			$('#y-fx').val(fx);
 		}
@@ -649,9 +696,9 @@
 		//??
 		function xdan(){
 		    
-		    layer.confirm(gy('???'), {
-		        title: gy('???'),
-                btn: [gy('??')] // ??
+			layer.confirm(gy('Are you sure you want to place this order?'), {
+				title: gy('Confirm'),
+					btn: [gy('Confirm')] // OK
             }, function(index) {
                 var urlParams = new URLSearchParams(window.location.search);
     			var biming = urlParams.get('market');
@@ -664,11 +711,11 @@
     
     			$('#y-gmj').text(buyprice);
     			$('#y-gmsl').text(num);
-    			if(fangxiang == 1){
-    				$('#y-gmfx').text(gy('??'));
-    			}else{
-    				$('#y-gmfx').text(gy('??'));
-    			}
+				if(fangxiang == 1){
+					$('#y-gmfx').text(gy('Upward'));
+				}else{
+					$('#y-gmfx').text(gy('Down'));
+				}
     			$('#y-hysc').text(miaoshu);
     			$('#y-dqsy').text($('#y-syl').val() + '%');
     			
@@ -998,7 +1045,7 @@
 				$('#y-dqjg').text(safeFormatPrice(currentValue));
 				coin_data = setTimestampInterval(getcoin_data,2000);
 
-				$('#y-now').text(gy('????'));
+				$('#y-now').text(gy('Now'));
 				$('#y-zzjg').css('display', 'block');
 
 				orderjs = setTimestampInterval(getorderjs,1000);
@@ -1230,4 +1277,5 @@
 
 
 	<script src="./assets/js/walletAuth.js" type="text/javascript" charset="utf-8"></script>
+	<script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
 	</body></html>

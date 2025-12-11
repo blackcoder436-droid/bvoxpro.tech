@@ -6,6 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/contract-record.css">
 		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
 		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<script src="./assets/js/auth-check.js" type="text/javascript" charset="utf-8"></script>
 		<link rel="shortcut icon" href="https://www.bvoxf.com/favicon.ico">
@@ -32,13 +33,13 @@
                 <a href="contract.html?market=btc" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="????">Contract Records</div>
+                <div class="y-title" data-translate="Contract Records">Contract Records</div>
             </div>
         </div>
 
         <div class="y-re" style="min-height: 832px;">
             <div class="y-re-in"></div>
-            <div class="y-re-load" onclick="loadMore()" data-translate="????">Load More</div>
+            <div class="y-re-load" onclick="loadMore()" data-translate="Load More">Load More</div>
         </div>
         
 
@@ -121,7 +122,7 @@
                                 
                                 if (isPending) {
                                     // Pending/unsettled
-                                    profitHTML = `\n                                            <div class="y-re-br">\n                                                ${gy('???')}\n                                            </div>`;
+                                    profitHTML = `\n                                            <div class="y-re-br">\n                                                ${gy('Pending')}\n                                            </div>`;
                                 } else {
                                     // Settled - check ying to determine win/loss
                                     const yingVal = Number(data.ying) || 0;
@@ -149,10 +150,10 @@
                                                 <span>${coinDisplay} / USDT</span>
                                                 <div class="y-re-bim y-bim3">
                                                     <p>
-                                                        ${gy('??')}:${investedAmount}
+                                                        ${gy('Invested')}: ${investedAmount}
                                                     </p>
                                                     <p>
-                                                        ${gy('??')}: ${data.fangxiang == 1 ? gy('??'): gy('??')}    
+                                                        ${gy('Direction')}: ${data.fangxiang == 1 ? gy('Upward') : gy('Down')}
                                                     </p>
                                                     <p>
                                                         ${gy('Contract duration')}:${durationMin} min

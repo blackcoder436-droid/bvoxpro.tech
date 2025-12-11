@@ -5,7 +5,8 @@
 		<title>Bvox</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/kyc2.css">
-		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
 		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<link rel="shortcut icon" href="https://www.bvoxf.com/favicon.ico">
 		<meta property="og:image" content="/favicon.png">
@@ -31,7 +32,7 @@
                 <a href="index.html" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="????">Advanced certification</div>
+                <div class="y-title" data-translate="Advanced certification">Advanced certification</div>
             </div>
         </div>
         <div class="y-kyc1" style="min-height: 832px;">
@@ -41,30 +42,30 @@
                     <div class="y-upload-box" id="housing-info-box">
                         <img src="./assets/img/image.png" class="y-camera-icon" alt="Camera Icon">
                         <img src="kyc2.html" class="y-preview" alt="Preview" id="y-idzheng">
-                        <div class="y-upload-label" data-translate="???????">Holding ID card photo</div>
+                        <div class="y-upload-label" data-translate="Holding ID card photo">Holding ID card photo</div>
                         <input type="file" id="housing-info-upload" accept="image/*">
                     </div>
                 </div>
             </div>
 
             <div class="y-kyc1-bo">
-                <h1 data-translate="?????">Did you know?</h1>
-                <p data-translate="??KYC??????????,?????????">Completing KYC certification can increase the transaction limit and ensure the safety of your funds.</p>
+                <h1 data-translate="Did you know?">Did you know?</h1>
+                <p data-translate="Completing KYC certification can increase the transaction limit and ensure the safety of your funds.">Completing KYC certification can increase the transaction limit and ensure the safety of your funds.</p>
             </div>
 
             <div class="y-kycbu">
-                <div class="y-dkljsq y-dkljsq2" data-translate="??" onclick="rzsubmit()">Confirm</div>
+                <div class="y-dkljsq y-dkljsq2" data-translate="Confirm" onclick="rzsubmit()">Confirm</div>
             </div>
         </div>
 
-        <div class="y-ytjrz" data-translate="?????" style="display: none;">Certification submitted</div>
+        <div class="y-ytjrz" data-translate="Certification submitted" style="display: none;">Certification submitted</div>
         
         
         <script>
             document.querySelector('.y-kyc1').style.minHeight = window.innerHeight + 'px';
             $(document).ready(function() {
-                $('#y-name').attr('placeholder',gy('?????'));
-                $('#y-zsbh').attr('placeholder',gy('???????'));
+                $('#y-name').attr('placeholder',gy('Please enter name'));
+                $('#y-zsbh').attr('placeholder',gy('Please enter number'));
 
 
                 var userid = Cookies.get('userid');
@@ -75,18 +76,18 @@
                         userid: userid
                     },
                     success: function (response) {
-                        if(response.code == 1){
-                            if(response.data.renzhengzhuangtai == 0){
-                                $('.y-ytjrz').text(gy('????????'));
-                                $('.y-ytjrz').show();
-                            }else{
-                                if (response.data.sfsqrz == 4) {
-                                    // ??4,??“?????”
-                                    $('.y-ytjrz').text(gy('?????')).show();
-                                } else if (response.data.sfsqrz == 5) {
-                                    // ??5,??“????”
-                                    $('.y-ytjrz').text(gy('??????')).show();
-                                }
+                            if(response.code == 1){
+                            	if(response.data.renzhengzhuangtai == 0){
+                                	$('.y-ytjrz').text(gy('Certification submitted'));
+                                	$('.y-ytjrz').show();
+                            	}else{
+                                	if (response.data.sfsqrz == 4) {
+                                    	// status 4 -> show submitted
+                                    	$('.y-ytjrz').text(gy('Certification submitted')).show();
+                                	} else if (response.data.sfsqrz == 5) {
+                                    	// status 5 -> show verification failed
+                                    	$('.y-ytjrz').text(gy('Verification failed')).show();
+                                	}
                             }
                         }
                     }
@@ -124,7 +125,7 @@
                                     previewImg.attr('data-ysrc', response.data);
                                     cameraIcon.hide();
                                 }else{
-                                    alert(gy('??'));
+                                    alert(gy('Upload failed'));
                                 }
                             }
                         });
@@ -140,7 +141,7 @@
                 var zphou = $('#y-idzheng').data('ysrc');
 
                 if(!zphou){
-                    alert(gy('??'));
+                    alert(gy('Please fill all required fields'));
                     return;
                 }
                 

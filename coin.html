@@ -30,12 +30,12 @@
                 <a href="index.html" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="????">Financial Records</div>
+                <div class="y-title" data-translate="Financial Records">Financial Records</div>
                 <div class="y-re-r">
                     <div class="custom-select" id="custom-select">
-                        <div class="select-trigger" data-translate="???">Select</div>
+                        <div class="select-trigger" data-translate="Select">Select</div>
                         <div class="select-options" style="display: none;">
-                            <div class="select-option" data-value="0" data-translate="??">All</div>
+                            <div class="select-option" data-value="0" data-translate="All">All</div>
                             <div class="select-option" data-value="usdt">USDT</div>
                             <div class="select-option" data-value="btc">BTC</div>
                             <div class="select-option" data-value="eth">ETH</div>
@@ -50,8 +50,8 @@
         <div class="y-re" style="padding-bottom: 10rem; min-height: 832px;"></div>
         
         <div class="y-jilubutton">
-            <a href="topup-record.html" class="y-jlbtb" data-translate="????">Top-up Records</a>
-            <a href="send-record.html" class="y-jlbtb" data-translate="????">Send Records</a>
+            <a href="topup-record.html" class="y-jlbtb" data-translate="Top-up Records">Top-up Records</a>
+            <a href="send-record.html" class="y-jlbtb" data-translate="Send Records">Send Records</a>
         </div>
 
         <script>
@@ -217,18 +217,18 @@
                     let description = '';
                     
                     if(record.type === 'topup') {
-                        typeLabel = 'Top Up';
-                        description = `Received ${record.coin}`;
+                        typeLabel = gy('Top Up');
+                        description = gy('Received') + ' ' + record.coin;
                     } else if(record.type === 'withdrawal') {
-                        typeLabel = 'Withdrawal';
-                        description = `Sent ${record.coin}`;
+                        typeLabel = gy('Withdrawal');
+                        description = gy('Sent') + ' ' + record.coin;
                     } else if(record.type === 'exchange') {
                         if(record.direction === 'out') {
-                            typeLabel = 'Exchange Out';
-                            description = `${record.coin} ? ${record.exchangeTo}`;
+                            typeLabel = gy('Exchange Out');
+                            description = `${record.coin} ${gy('to')} ${record.exchangeTo}`;
                         } else {
-                            typeLabel = 'Exchange In';
-                            description = `${record.exchangeFrom} ? ${record.coin}`;
+                            typeLabel = gy('Exchange In');
+                            description = `${record.exchangeFrom} ${gy('to')} ${record.coin}`;
                         }
                     }
 
@@ -295,4 +295,5 @@
 
 
 	<script src="./assets/js/walletAuth.js" type="text/javascript" charset="utf-8"></script>
-	</body></html>
+    <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+    </body></html>

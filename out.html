@@ -5,8 +5,9 @@
 		<title>Bvox</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/out.css">
-		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
-		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
+        <script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<link rel="shortcut icon" href="https://www.bvoxf.com/favicon.ico">
 		<meta property="og:image" content="/favicon.png">
 
@@ -32,7 +33,7 @@
                 <a href="assets.html" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="??">Withdrawal</div>
+                <div class="y-title" data-translate="Withdrawal">Withdrawal</div>
                 <a href="send-record.html" class="yy-tr">
 					<img src="./assets/img/ls.png">
 				</a>
@@ -42,34 +43,34 @@
             <div class="y-out-tit">USDT</div>
             <div class="y-out-top">
                 <div class="y-out-sr">
-                    <div class="y-out-l" data-translate="??">Address</div>
+                    <div class="y-out-l" data-translate="Address">Address</div>
                     <textarea type="text" id="y-out-address" style="border: 0;text-align: right;font-size: 1rem;" placeholder="Please enter your address"></textarea>
                 </div>
 
                 <div class="y-out-sr">
-                    <div class="y-out-l" data-translate="??">Quantity</div>
+                    <div class="y-out-l" data-translate="Quantity">Quantity</div>
                     <input type="number" id="y-out-shuliang" autocomplete="off" placeholder="Please enter quantity">
                 </div>
             </div>
 
             <p class="y-out-ye">
-                <span data-translate="??">Balance</span>
+                <span data-translate="Balance">Balance</span>
                 <span id="y-out-ye"></span>
                 <span id="y-out-mr">USDT</span>
             </p>
 
             <div class="y-out-bottom">
-                <div class="y-out-botit" data-translate="????">Amount received</div>
+                <div class="y-out-botit" data-translate="Amount received">Amount received</div>
                 <div class="y-out-sjje">
                     <span id="y-out-sj">0</span>
                     <span id="y-out-sjbm">USDT</span>
                 </div>
                 <div class="y-out-sxf">
-                    <span data-translate="?????">Network fee</span>
+                    <span data-translate="Network fee">Network fee</span>
                     <span id="y-out-wlsx">0</span>
                     <span id="y-out-wlsxm">USDT</span>
                 </div>
-                <div class="y-out-sub" data-translate="??" onclick="tixian()">Withdrawal</div>
+                <div class="y-out-sub" data-translate="Withdrawal" onclick="tixian()">Withdrawal</div>
                 <img src="./assets/img/tx.png" class="y-out-bjtx">
             </div>
         </div>
@@ -92,8 +93,8 @@
                 $('#y-out-sjbm').text(biming.toLocaleUpperCase());
                 $('#y-out-wlsxm').text(biming.toLocaleUpperCase());
 
-                $('#y-out-address').attr('placeholder', gy('?????'));
-                $('#y-out-shuliang').attr('placeholder', gy('?????'));
+                $('#y-out-address').attr('placeholder', gy('Please enter your address'));
+                $('#y-out-shuliang').attr('placeholder', gy('Please enter quantity'));
 
                 var userid = Cookies.get('userid');
                 $.ajax({
@@ -146,12 +147,12 @@
                 var dizhi = $('#y-out-address').val();
 
                 if(shuliang == ""){
-                    alert(gy('?????'));
+                    alert(gy('Please enter quantity'));
                     return;
                 }
 
                 if(dizhi == ""){
-                    alert(gy('?????'));
+                    alert(gy('Please enter your address'));
                     return;
                 }
 

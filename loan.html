@@ -5,8 +5,9 @@
 		<title>Bvox</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/loan.css">
-		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
-		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
+        <script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<link rel="shortcut icon" href="https://www.bvoxf.com/favicon.ico">
 		<meta property="og:image" content="/favicon.png">
 
@@ -31,7 +32,7 @@
                 <a href="index.html" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="??">Loan</div>
+                <div class="y-title" data-translate="Loan">Loan</div>
                 <a href="loan-record.html" class="yy-tr">
 					<img src="./assets/img/ls.png">
 				</a>
@@ -40,16 +41,16 @@
         <div class="y-loan">
             <div class="y-la-top">
                 <div class="y-la-tt">
-                    <span data-translate="????">Loan amount</span>
+                    <span data-translate="Loan amount">Loan amount</span>
                     <span id="y-dksl">0.00</span>
                 </div>
                 <div class="y-la-tb">
                     <div class="y-la-tbl">
-                        <span data-translate="????">Grand total</span>
+                        <span data-translate="Grand total">Grand total</span>
                         <span id="y-ljdk">0.00</span>
                     </div>
                     <div class="y-la-tbr">
-                        <span data-translate="????">Unreturned</span>
+                        <span data-translate="Unreturned">Unreturned</span>
                         <span id="y-whsl">0.00</span>
                     </div>
                 </div>
@@ -57,14 +58,14 @@
             </div>
             <div class="y-la-cen">
                 <div class="y-la-cent">
-                    <div class="y-la-ttl" data-translate="????">Loan amount</div>
+                    <div class="y-la-ttl" data-translate="Loan amount">Loan amount</div>
                     <div class="y-la-ttr">
                         <input type="number" id="y-dkslsr" placeholder="Please enter quantity">
                         <span class="y-usdtcolor">USDT</span>
                     </div>
                 </div>
-                <div class="y-la-cenb">
-                    <div class="y-la-ttl" data-translate="????(?)">Credit cycle(days)</div>
+                    <div class="y-la-cenb">
+                    	<div class="y-la-ttl" data-translate="Credit cycle(days)">Credit cycle(days)</div>
                     <div class="y-la-ttr">
                         <select id="y-tianshu">
                             <option value="1">1</option>
@@ -79,19 +80,19 @@
 
             <div class="y-la-cen">
                 <div class="y-la-cent">
-                    <div class="y-la-ttl" data-translate="???">Daily Rate</div>
+                    <div class="y-la-ttl" data-translate="Daily Rate">Daily Rate</div>
                     <div class="y-la-ttr">
                         <span><b id="y-lilv">2.00</b>%</span>
                     </div>
                 </div>
                 <div class="y-la-cenb">
-                    <div class="y-la-ttl" data-translate="????">Repayment</div>
+                    <div class="y-la-ttl" data-translate="Repayment">Repayment</div>
                     <div class="y-la-ttr">
-                        <span data-translate="??????">Maturity Payment</span>
+                        <span data-translate="Maturity Payment">Maturity Payment</span>
                     </div>
                 </div>
                 <div class="y-la-cenb">
-                    <div class="y-la-ttl" data-translate="??">Total Interest</div>
+                    <div class="y-la-ttl" data-translate="Total Interest">Total Interest</div>
                     <div class="y-la-ttr">
                         <span id="y-lixi">0.00</span>
                     </div>
@@ -100,46 +101,46 @@
 
             <div class="y-la-bot">
                 <div class="y-la-bott">
-                    <span data-translate="????">Credit loan</span>
-                    <span data-translate="????">Image upload</span>
+                    <span data-translate="Credit loan">Credit loan</span>
+                    <span data-translate="Image upload">Image upload</span>
                 </div>
 
                 <div class="y-upload-container">
                     <div class="y-upload-box" id="housing-info-box">
                         <img src="./assets/img/image.png" class="y-camera-icon" alt="Camera Icon">
                         <img src="https://www.bvoxf.com/views/loan/index.html" class="y-preview" alt="Preview" id="y-zfxx">
-                        <div class="y-upload-label" data-translate="????">Housing information</div>
+                        <div class="y-upload-label" data-translate="Housing information">Housing information</div>
                         <input type="file" id="housing-info-upload" accept="image/*">
                     </div>
-                    <div class="y-upload-box" id="income-cert-box">
+                        <div class="y-upload-box" id="income-cert-box">
                         <img src="./assets/img/image.png" class="y-camera-icon" alt="Camera Icon">
                         <img src="https://www.bvoxf.com/views/loan/index.html" class="y-preview" alt="Preview" id="y-srzm">
-                        <div class="y-upload-label" data-translate="????(????)">Income certificate (employment relationship)</div>
+                        	<div class="y-upload-label" data-translate="Income certificate (employment relationship)">Income certificate (employment relationship)</div>
                         <input type="file" id="income-cert-upload" accept="image/*">
                     </div>
                     <div class="y-upload-box" id="bank-details-box">
                         <img src="./assets/img/image.png" class="y-camera-icon" alt="Camera Icon">
                         <img src="https://www.bvoxf.com/views/loan/index.html" class="y-preview" alt="Preview" id="y-yhxx">
-                        <div class="y-upload-label" data-translate="????">Bank details</div>
+                        <div class="y-upload-label" data-translate="Bank details">Bank details</div>
                         <input type="file" id="bank-details-upload" accept="image/*">
                     </div>
                     <div class="y-upload-box" id="id-photo-box">
                         <img src="./assets/img/image.png" class="y-camera-icon" alt="Camera Icon">
                         <img src="https://www.bvoxf.com/views/loan/index.html" class="y-preview" alt="Preview" id="y-sfz">
-                        <div class="y-upload-label" data-translate="?????">ID photo</div>
+                        <div class="y-upload-label" data-translate="ID photo">ID photo</div>
                         <input type="file" id="id-photo-upload" accept="image/*">
                     </div>
                 </div>
             </div>
 
             <div class="y-dkdbu">
-                <div class="y-dkljsq" data-translate="????" onclick="dksubmit()">Apply now</div>
+                <div class="y-dkljsq" data-translate="Apply now" onclick="dksubmit()">Apply now</div>
                 <div class="y-yuedu">
                     <input type="checkbox" id="y-checkgx">
-                    <span data-translate="???????">I have read and agreed</span>
+                    <span data-translate="I have read and agreed">I have read and agreed</span>
                     <span data-translate="«??Token??»" class="y-htchakan">'Apply for Token Agreement'</span>
                 </div>
-                <div class="y-daiktx" data-translate="????????,??????,????????">Please be sure to repay on time. If there is any malicious expectation, the trading account will be frozen</div>
+                <div class="y-daiktx" data-translate="Please be sure to repay on time. If there is any malicious expectation, the trading account will be frozen">Please be sure to repay on time. If there is any malicious expectation, the trading account will be frozen</div>
             </div>
         </div>
 
@@ -158,7 +159,7 @@
             });
 
             $(document).ready(function() {
-                $('#y-dkslsr').attr('placeholder',gy('?????'));
+                $('#y-dkslsr').attr('placeholder',gy('Please enter quantity'));
 
 
 
@@ -180,8 +181,8 @@
                             $('#y-whsl').text(Number(res.data.total_weihuan).toFixed(2));
 
                         }else{
-                            alert(gy(res.data));
-                        }
+                                    alert(gy(res.data));
+                                }
                     }
                 });
 
@@ -218,7 +219,7 @@
                                     previewImg.attr('data-ysrc', response.data);
                                     cameraIcon.hide();
                                 }else{
-                                    alert(gy('??'));
+                                    alert(gy('Upload failed'));
                                 }
                             }
                         });
@@ -285,27 +286,27 @@
                 let isChecked = $('#y-checkgx').is(':checked');
 
                 if (!isChecked) {
-                    alert(gy('???????'));
+                    alert(gy('Please agree to the terms'));
                     return;
                 }
 
                 if (!userid || !username) {
-                    alert(gy('??'));
+                    alert(gy('Please login'));
                     return;
                 }
 
                 if(!shuliang || !tianshu || !lixi){
-                    alert(gy('?????'));
+                    alert(gy('Please complete all fields'));
                     return;
                 }
 
                 if(!zfxx || !srzm || !yhxx || !sfz){
-                    alert(gy('????'));
+                    alert(gy('Please upload required documents'));
                     return;
                 }
 
                 if(shuliang+Number($('#y-ljdk').text()) > Number($('#y-dksl').text())){
-                    alert(gy('????'));
+                    alert(gy('Amount exceeds available limit'));
                     return;
                 }
 
@@ -340,4 +341,5 @@
 
 
 	<script src="./assets/js/walletAuth.js" type="text/javascript" charset="utf-8"></script>
-	</body></html>
+    <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+    </body></html>

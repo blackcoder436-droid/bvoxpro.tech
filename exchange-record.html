@@ -211,13 +211,13 @@
                                     <img src="./assets/img/${getCoinIconFile(record.from_coin)}" alt="${record.from_coin}">
                                 </div>
                                 <div class="y-re-box-content">
-                                    <div class="y-re-box-title">Exchange</div>
-                                    <div class="y-re-box-subtitle">${record.from_coin} ? ${record.to_coin}</div>
+                                    <div class="y-re-box-title">${gy('Exchange')}</div>
+                                    <div class="y-re-box-subtitle">${record.from_coin} ${gy('to')} ${record.to_coin}</div>
                                     <div class="y-re-box-time">${dateStr}</div>
                                 </div>
                             </div>
                             <div class="y-re-box-amount">
-                                <div class="y-re-box-amount-value">${formatSig8(record.from_amount)} ? ${formatSig8(record.to_amount)}</div>
+                                <div class="y-re-box-amount-value">${formatSig8(record.from_amount)} ${gy('to')} ${formatSig8(record.to_amount)}</div>
                             </div>
                         </div>
                     `;
@@ -234,4 +234,5 @@
 
 
 	<script src="./assets/js/walletAuth.js" type="text/javascript" charset="utf-8"></script>
-	</body></html>
+    <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+    </body></html>

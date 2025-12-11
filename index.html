@@ -5,6 +5,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/index.css">
 		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+		<script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
 		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<link rel="shortcut icon" href="./assets/img/favicon.ico">
 		<meta property="og:image" content="/favicon.png">
@@ -35,25 +36,25 @@
 					<span>
 						<img src="./assets/img/1.png">
 					</span>
-					<p data-translate="??">Mining</p>
+					<p data-translate="Mining">Mining</p>
 				</a>
 				<a href="contract.html?market=btc">
 					<span>
 						<img src="./assets/img/3.png">
 					</span>
-					<p data-translate="????">Contract</p>
+					<p data-translate="Contract">Contract</p>
 				</a>
 				<a href="ai-arbitrage.html">
 					<span>
 						<img src="./assets/img/4.png">
 					</span>
-					<p data-translate="??????">AI arbitrage</p>
+					<p data-translate="AI arbitrage">AI arbitrage</p>
 				</a>
 				<a href="loan.html">
 					<span>
 						<img src="./assets/img/2.png">
 					</span>
-					<p data-translate="??">Loan</p>
+					<p data-translate="Loan">Loan</p>
 				</a>
 			</div>
 			<div class="market index-div-base-margin">
@@ -216,7 +217,7 @@
 			<div class="tab-container">
 				<a href="/" class="tab-item">
 					<img src="./assets/img/6-a.png" class="tab-icon">
-					<span class="tab-text fcy" data-translate="??">Home</span>
+					<span class="tab-text fcy" data-translate="Home">Home</span>
 				</a>
 				<a href="contract.html?market=btc" class="tab-center">
 					<div class="tab-center-icon">
@@ -225,7 +226,7 @@
 				</a>
 				<a href="assets.html" class="tab-item">
 					<img src="./assets/img/16.png" class="tab-icon">
-					<span class="tab-text" data-translate="??">Assets</span>
+					<span class="tab-text" data-translate="Assets">Assets</span>
 				</a>
 			</div>
 		</div>
@@ -245,7 +246,7 @@
 						<b id="y-rzzt"></b>
 					</span>
 					<span class="y-txc-b">
-						<b data-translate="???">Credit score</b>
+						<b data-translate="Credit score">Credit score</b>
 						<b id="y-xyf"></b>
 					</span>
 				</p>
@@ -257,7 +258,7 @@
 						<img src="./assets/img/23.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????">Identity Authentication</span>
+						<span class="fzm fcch" data-translate="Identity Authentication">Identity Authentication</span>
 					</div>
 				</div>
 			</a>
@@ -267,7 +268,7 @@
 						<img src="./assets/img/14.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????">Financial Records</span>
+						<span class="fzm fcch" data-translate="Financial Records">Financial Records</span>
 					</div>
 				</div>
 			</a>
@@ -277,7 +278,7 @@
 						<img src="/img/cd/10.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????"></span>
+						<span class="fzm fcch" data-translate="More">More</span>
 					</div>
 				</div>
 			</a> -->
@@ -299,7 +300,7 @@
 						<img src="./assets/img/15.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????">Regulatory License</span>
+						<span class="fzm fcch" data-translate="Regulatory License">Regulatory License</span>
 					</div>
 				</div>
 			</a>
@@ -309,7 +310,7 @@
 						<img src="./assets/img/18.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????">FAQs</span>
+						<span class="fzm fcch" data-translate="FAQs">FAQs</span>
 					</div>
 				</div>
 			</a>
@@ -319,7 +320,7 @@
 						<img src="./assets/img/22.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????">Select language</span>
+						<span class="fzm fcch" data-translate="Select language">Select language</span>
 					</div>
 				</div>
 			</a>
@@ -329,7 +330,7 @@
 						<img src="./assets/img/20.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="????">Live Chat</span>
+						<span class="fzm fcch" data-translate="Live Chat">Live Chat</span>
 					</div>
 				</div>
 			</a>
@@ -340,7 +341,7 @@
 						<img src="./assets/img/27.png">
 					</div>
 					<div class="f_op_b">
-						<span class="fzm fcch" data-translate="???">Security code</span>
+						<span class="fzm fcch" data-translate="Security code">Security code</span>
 					</div>
 				</div>
 			</div>
@@ -414,13 +415,13 @@
 					resolveUserId(function(panelUserId) {
 						$('#y-usid').text(panelUserId || '');
 						$.post(apiurl + "/Wallet/getuserzt", { userid: panelUserId }, function(res) {
-							if (res && res.code == 1) {
+								if (res && res.code == 1) {
 								if (res.data['renzhengzhuangtai'] == 0) {
 									$('#y-rzzt').text('Unverified');
 								} else if (res.data['renzhengzhuangtai'] == 1) {
-									$('#y-rzzt').text(gy('??'));
+									$('#y-rzzt').text(gy('Under Review'));
 								} else if (res.data['renzhengzhuangtai'] == 2) {
-									$('#y-rzzt').text(gy('??'));
+									$('#y-rzzt').text(gy('Verified'));
 								}
 								$('#y-xyf').text(res.data['xinyongfen']);
 							}
@@ -778,4 +779,6 @@
 
 	</script>
 
-</body></html>
+		<script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+
+	</body></html>

@@ -5,7 +5,8 @@
 		<title>Bvox</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/kyc1.css">
-		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
 		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<link rel="shortcut icon" href="https://www.bvoxf.com/favicon.ico">
 		<meta property="og:image" content="/favicon.png">
@@ -31,31 +32,31 @@
                 <a href="index.html" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="????">Identity Authentication</div>
+                <div class="y-title" data-translate="Identity Authentication">Identity Authentication</div>
             </div>
         </div>
         <div class="y-kyc1" style="min-height: 832px;">
             <div class="y-kyc1-cen">
                 <div class="y-kyc1-cent">
-                    <div class="y-kyc1-ttl" data-translate="??">Full name</div>
+                    <div class="y-kyc1-ttl" data-translate="Full name">Full name</div>
                     <div class="y-kyc1-ttr">
                         <input type="text" id="y-name" placeholder="Please enter name">
                     </div>
                 </div>
                 
                 <div class="y-kyc1-cenb">
-                    <div class="y-kyc1-ttl" data-translate="????">Certificate Type</div>
+                    <div class="y-kyc1-ttl" data-translate="Certificate Type">Certificate Type</div>
                     <div class="y-kyc1-ttr">
                         <select id="y-card">
-                            <option value="1" data-translate="???">ID Card</option>
-                            <option value="2" data-translate="???">Driver's license</option>
-                            <option value="3" data-translate="???">NCO Certificate</option>
+                            <option value="1" data-translate="ID Card">ID Card</option>
+                            <option value="2" data-translate="Driver's license">Driver's license</option>
+                            <option value="3" data-translate="NCO Certificate">NCO Certificate</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="y-kyc1-cent">
-                    <div class="y-kyc1-ttl" data-translate="????">Certificate number</div>
+                    <div class="y-kyc1-ttl" data-translate="Certificate number">Certificate number</div>
                     <div class="y-kyc1-ttr">
                         <input type="text" id="y-zsbh" placeholder="Please enter number">
                     </div>
@@ -64,7 +65,7 @@
             <div class="y-la-bot">
                 <div class="y-la-bott">
                     <span data-translate="KYC??">KYC Verification</span>
-                    <span data-translate="????">Image upload</span>
+                    <span data-translate="Image upload">Image upload</span>
                 </div>
 
                 <div class="y-upload-container">
@@ -84,23 +85,23 @@
             </div>
 
             <div class="y-kyc1-bo">
-                <h1 data-translate="?????">Did you know?</h1>
-                <p data-translate="??KYC??????????,?????????">Completing KYC certification can increase the transaction limit and ensure the safety of your funds.</p>
+                <h1 data-translate="Did you know?">Did you know?</h1>
+                <p data-translate="Completing KYC certification can increase the transaction limit and ensure the safety of your funds.">Completing KYC certification can increase the transaction limit and ensure the safety of your funds.</p>
             </div>
 
             <div class="y-kycbu">
-                <div class="y-dkljsq y-dkljsq2" data-translate="??" onclick="rzsubmit()">Confirm</div>
+                <div class="y-dkljsq y-dkljsq2" data-translate="Confirm" onclick="rzsubmit()">Confirm</div>
             </div>
         </div>
 
-        <div class="y-ytjrz" data-translate="?????" style="display: none;">Certification submitted</div>
+        <div class="y-ytjrz" data-translate="Certification submitted" style="display: none;">Certification submitted</div>
         
         
         <script>
             document.querySelector('.y-kyc1').style.minHeight = window.innerHeight + 'px';
             $(document).ready(function() {
-                $('#y-name').attr('placeholder',gy('?????'));
-                $('#y-zsbh').attr('placeholder',gy('???????'));
+                $('#y-name').attr('placeholder',gy('Please enter name'));
+                $('#y-zsbh').attr('placeholder',gy('Please enter number'));
 
                 var userid = Cookies.get('userid');
                 $.ajax({
@@ -110,16 +111,16 @@
                         userid: userid
                     },
                     success: function (response) {
-                        if(response.code ==1){
-                            if (response.data == 0 || response.data == 3) {
-                                // 0???,3????,???
-                                $('.y-ytjrz').hide();
+                            if(response.code ==1){
+                            	if (response.data == 0 || response.data == 3) {
+                                	// 0/3 -> hidden
+                                	$('.y-ytjrz').hide();
                             } else if (response.data == 1) {
-                                // 1???????,??“?????”
-                                $('.y-ytjrz').text(gy('?????')).show();
+                                	// 1 -> submitted
+                                	$('.y-ytjrz').text(gy('Certification submitted')).show();
                             } else if (response.data == 2 || [4, 5, 6].includes(response.data)) {
-                                // 2????,4???????,5????,6????,??“????”
-                                $('.y-ytjrz').text(gy('??????')).show();
+                                	// 2/4/5/6 -> verification failed or other states
+                                	$('.y-ytjrz').text(gy('Verification failed')).show();
                             }
                         }
                     }
@@ -158,7 +159,7 @@
                                     previewImg.attr('data-ysrc', response.data);
                                     cameraIcon.hide();
                                 }else{
-                                    alert(gy('??'));
+                                    alert(gy('Upload failed'));
                                 }
                             }
                         });
@@ -176,7 +177,7 @@
                 var zphou = $('#y-idfan').data('ysrc');
 
                 if(!name || !type || !idnum || !zpqian || !zphou){
-                    alert(gy('??'));
+                    alert(gy('Please fill all required fields'));
                     return;
                 }
                 

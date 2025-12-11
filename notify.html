@@ -5,8 +5,9 @@
 		<title>Bvox</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<link rel="stylesheet" href="./assets/css/noti.css">
-		<script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
-		<script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
+        <script src="./assets/js/jquery.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/i18n.js" type="text/javascript" charset="utf-8"></script>
+        <script src="./assets/js/config.js" type="text/javascript" charset="utf-8"></script><script src="./assets/js/pako.min.js"></script><script src="./assets/js/js.cookie.min.js"></script><script src="./assets/js/web3.min.js"></script><script src="./assets/js/web3model.min.js"></script><script src="./assets/js/web3provider.js"></script><script src="./assets/js/fp.min.js"></script>
 		<link rel="shortcut icon" href="https://www.bvoxf.com/favicon.ico">
 		<meta property="og:image" content="/favicon.png">
 
@@ -31,13 +32,13 @@
                 <a href="index.html" class="y-fanhui">
                     <img src="./assets/img/fanhui.png">
                 </a>
-                <div class="y-title" data-translate="??">Notify</div>
+                <div class="y-title" data-translate="Notify">Notify</div>
             </div>
         </div>
 
         <div class="y-re" style="min-height: 832px;">
             <div class="y-re-in"></div>
-            <div class="y-re-load" onclick="loadMore()" data-translate="????">Load More</div>
+            <div class="y-re-load" onclick="loadMore()" data-translate="Load More">Load More</div>
         </div>
         
 
@@ -95,7 +96,7 @@
                                                 <div class="y-sfyidu">
                                                     ${new Date(parseInt(data.shijian) * 1000).toLocaleString("en-US", { timeZone: "America/New_York" })}
                                                     <span class="y-read-status ${data.sfyidu === 0 ? 'y-read-show' : ''}">
-                                                        ${data.sfyidu === 0 ? gy('??') : gy('??')}
+                                                        ${data.sfyidu === 0 ? gy('Unread') : gy('Read')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -137,8 +138,8 @@
                     data: { userid: userid, id: id },
                     dataType: 'json',
                     success: function(res) {
-                        if (res && res.code === 1) {
-                            $a.find('.y-read-status').removeClass('y-read-show').text(gy('??'));
+                            if (res && res.code === 1) {
+                            	$a.find('.y-read-status').removeClass('y-read-show').text(gy('Read'));
                         }
                         // navigate after marking (regardless)
                         window.location = href;
@@ -191,7 +192,7 @@
                                             <div class="y-sfyidu">
                                                 ${new Date(parseInt(data.shijian) * 1000).toLocaleString("en-US", { timeZone: "America/New_York" })}
                                                 <span class="y-read-status ${data.sfyidu === 0 ? 'y-read-show' : ''}">
-                                                    ${data.sfyidu === 0 ? gy('??') : gy('??')}
+                                                    ${data.sfyidu === 0 ? gy('Unread') : gy('Read')}
                                                 </span>
                                             </div>
                                         </div>
