@@ -33,9 +33,51 @@ async function verifyAdminToken(req) {
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 try { if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) { console.warn('Could not create uploads dir:', e.message); }
 
-// ============= PROXY / DB-FALLBACK ROUTES =============
-// Note: handlers for `/api/Trade/getcoin_data` and `/api/Trade/gettradlist` are defined
-// later in this file and implement a DB-first strategy with external proxy fallback.
+// ============= PROXY ROUTES =============
+
+// Proxy for /api/Trade/gettradlist to remote API (note: remote URL has 'e' in gettradelist)
+const REMOTE_TRADE_LIST_URL = 'https://api.bvoxf.com/api/Trade/gettradelist';
+router.post(['/api/Trade/gettradlist', '/api/trade/gettradlist'], (req, res) => {
+    try {
+        // Convert body to URL-encoded form (matching what old server.js does)
+        let bodyStr = '';
+        const body = req.body || {};
+        if (typeof body === 'string') {
+            bodyStr = body;
+        } else if (typeof body === 'object') {
+            // Convert JSON body to URL-encoded format: key1=value1&key2=value2
+            bodyStr = Object.keys(body)
+                .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(body[key])}`)
+                .join('&');
+        }
+        
+        const urlObj = new URL(REMOTE_TRADE_LIST_URL);
+        const options = {
+            hostname: urlObj.hostname,
+            path: urlObj.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(bodyStr)
+            }
+        };
+        const proxyReq = https.request(options, proxyRes => {
+            let data = '';
+            proxyRes.on('data', chunk => { data += chunk; });
+            proxyRes.on('end', () => {
+                res.status(proxyRes.statusCode).set(proxyRes.headers).send(data);
+            });
+        });
+        proxyReq.on('error', err => {
+            console.error('[proxy] /api/Trade/gettradlist error:', err.message);
+            res.status(502).json({ error: 'Proxy error', detail: err.message });
+        });
+        proxyReq.write(bodyStr);
+        proxyReq.end();
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // ============= USER ENDPOINTS =============
 
@@ -2877,13 +2919,7 @@ async function proxyPostExternal(externalUrl, req, res) {
             let responseData = '';
             extRes.on('data', chunk => responseData += chunk);
             extRes.on('end', () => {
-                // Remove headers that can conflict when forwarded through nginx
-                const forwardedHeaders = Object.assign({}, extRes.headers);
-                delete forwardedHeaders['content-length'];
-                delete forwardedHeaders['transfer-encoding'];
-                // Ensure content-type present
-                if (!forwardedHeaders['content-type']) forwardedHeaders['content-type'] = 'application/json';
-                res.status(extRes.statusCode).set(forwardedHeaders).send(responseData);
+                res.status(extRes.statusCode).type('application/json').send(responseData);
             });
         });
 
@@ -2932,55 +2968,15 @@ router.post(['/api/User/getsfxtz', '/api/user/getsfxtz'], async (req, res) => {
     }
 });
 
-// Prefer local DB for coin data and tradelist; fallback to external proxy when missing
-router.post(['/api/Trade/getcoin_data', '/api/trade/getcoin_data'], async (req, res) => {
-    try {
-        const coin = (req.body.coinname || req.body.coin || '').toString().toLowerCase();
-        try {
-            const Trade = require('../models/Trade');
-            const q = coin ? { $or: [ { biming: new RegExp(coin, 'i') }, { pair: new RegExp(coin, 'i') } ] } : {};
-            const last = await Trade.findOne(q).sort({ created_at: -1 }).lean().exec();
-            if (last) {
-                const close = last.close || last.final_price || last.entry_price || last.buyprice || last.price || 0;
-                const amount = last.amount || last.num || 0;
-                return res.json({ code: 1, data: { close: close, amount: amount } });
-            }
-        } catch (e) {
-            console.warn('[getcoin_data] local DB query failed:', e.message);
-        }
-        const external = 'https://api.bvoxf.com/api/Trade/getcoin_data';
-        return proxyPostExternal(external, req, res);
-    } catch (e) {
-        console.error('[getcoin_data] error:', e.message);
-        return res.status(500).json({ code: 0, data: e.message });
-    }
+// POST /api/Trade/getcoin_data and /api/Trade/gettradlist proxy to external API
+router.post(['/api/Trade/getcoin_data', '/api/trade/getcoin_data'], (req, res) => {
+    const external = 'https://api.bvoxf.com/api/Trade/getcoin_data';
+    proxyPostExternal(external, req, res);
 });
 
-router.post(['/api/Trade/gettradlist', '/api/trade/gettradlist'], async (req, res) => {
-    try {
-        const coin = (req.body.coinname || req.body.coin || '').toString().toLowerCase();
-        try {
-            const Trade = require('../models/Trade');
-            const q = coin ? { $or: [ { biming: new RegExp(coin, 'i') }, { pair: new RegExp(coin, 'i') } ] } : {};
-            const docs = await Trade.find(q).sort({ created_at: -1 }).limit(100).lean().exec();
-            if (docs && docs.length) {
-                const mapped = docs.map(d => ({
-                    ts: d.entry_time ? new Date(d.entry_time).toISOString().substr(11,8) : (d.timestamp ? new Date(d.timestamp*1000).toISOString().substr(11,8) : ''),
-                    strtype: (d.fangxiang || d.type || '').toString(),
-                    price: d.entry_price || d.buyprice || d.price || d.final_price || 0,
-                    amount: d.amount || d.num || 0
-                }));
-                return res.json({ code: 1, data: mapped });
-            }
-        } catch (e) {
-            console.warn('[gettradlist] local DB query failed:', e.message);
-        }
-        const external = 'https://api.bvoxf.com/api/Trade/gettradlist';
-        return proxyPostExternal(external, req, res);
-    } catch (e) {
-        console.error('[gettradlist] error:', e.message);
-        return res.status(500).json({ code: 0, data: e.message });
-    }
+router.post(['/api/Trade/gettradlist', '/api/trade/gettradlist'], (req, res) => {
+    const external = 'https://api.bvoxf.com/api/Trade/gettradlist';
+    proxyPostExternal(external, req, res);
 });
 
 // POST /api/Record/getcontract - return trades for user (legacy shape)
