@@ -65,16 +65,16 @@ router.post(['/api/Trade/gettradlist', '/api/trade/gettradlist'], (req, res) => 
             let data = '';
             proxyRes.on('data', chunk => { data += chunk; });
             proxyRes.on('end', () => {
-                // Sanitize upstream headers before forwarding to client
+                // Sanitize upstream headers before forwarding to client.
+                // We buffer the upstream body, so always remove any
+                // Transfer-Encoding header and set an accurate Content-Length
+                // to avoid nginx rejecting responses that include both.
                 const headers = Object.assign({}, proxyRes.headers || {});
-                // Remove Transfer-Encoding if Content-Length is present to avoid
-                // sending both headers which will cause nginx to return 502.
-                if (headers['content-length'] && headers['transfer-encoding']) {
+                if (headers['transfer-encoding']) {
                     delete headers['transfer-encoding'];
                 }
-                // Ensure Content-Length matches actual body length
                 try {
-                    headers['content-length'] = Buffer.byteLength(data);
+                    headers['content-length'] = String(Buffer.byteLength(data));
                 } catch (e) {
                     // ignore
                 }
