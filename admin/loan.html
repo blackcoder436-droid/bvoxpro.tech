@@ -9,9 +9,27 @@
     body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:#1a1f2e;color:#e6edf3}
     .container{max-width:1400px;margin:0 auto;padding:40px 20px}
     .header{background:linear-gradient(135deg,#667eea,#764ba2);padding:20px 30px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:12px}
-    .back-btn{display:inline-block;text-decoration:none;color:rgba(255,255,255,0.95);background:rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px;font-weight:700;margin-right:8px}
-    .back-btn:hover{background:rgba(255,255,255,0.12)}
+    .header{position:relative}
+    .back-btn {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:36px;
+      height:36px;
+      border-radius:6px;
+      background:transparent;
+      border:1px solid #30363d;
+      color:#e6edf3;
+      text-decoration:none;
+      font-size:18px;
+      transition:all .2s;
+    }
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: white;
+    }
     .header h1{font-size:24px;font-weight:700;color:#fff}
+    .header .title-wrapper{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;text-align:center}
     .filters{background:#252d3d;padding:20px 30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:15px;border:1px solid #404a5e;border-top:none;margin-bottom:20px}
     .filter-group{display:flex;flex-direction:column;gap:6px}
     .filter-group label{font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase}
@@ -32,6 +50,7 @@
     .action-buttons{display:flex;gap:8px}
     .btn-approve{background:#238636;color:#fff;padding:6px 12px;border:none;border-radius:6px;cursor:pointer}
     .btn-reject{background:#da3633;color:#fff;padding:6px 12px;border:none;border-radius:6px;cursor:pointer}
+    .btn-delete{background:#7f1d1d;color:#fff;padding:6px 12px;border:none;border-radius:6px;cursor:pointer}
     .no-data{text-align:center;padding:60px 20px;color:#8b949e}
     .pagination{display:flex;justify-content:center;gap:8px;margin-top:30px;align-items:center}
   </style>
@@ -50,7 +69,7 @@
     })();
   </script>
   <div class="container">
-    <div class="header"><a href="/admin/dashboard.html" class="back-btn">← Dashboard</a><span class="icon">💵</span><h1>Loan Applications</h1></div>
+    <div class="header"><a href="/admin/dashboard.html" class="back-btn">←</a><div class="title-wrapper"><span class="icon">💵</span><h1>Loan Applications</h1></div></div>
 
     <div class="filters">
       <div class="filter-group"><label>Search Order ID</label><input id="filterOrder" placeholder="Order ID..." /></div>
@@ -120,7 +139,7 @@
             <td>${r.interest||''}</td>
             <td><span class="status-badge ${statusClass}">${status}</span></td>
             <td>${new Date(r.created_at||r.startDate||r.createdAt||'').toLocaleString()}</td>
-            <td><div class="action-buttons">${status==='pending'?`<button class="btn-approve" data-id="${r.id||r.orderId}">Approve</button><button class="btn-reject" data-id="${r.id||r.orderId}">Reject</button>`:'<button class="btn-approve" disabled>Approve</button>'}</div></td>
+            <td><div class="action-buttons">${status==='pending'?`<button class="btn-approve" data-id="${r.id||r.orderId}">Approve</button><button class="btn-reject" data-id="${r.id||r.orderId}">Reject</button><button class="btn-delete" data-id="${r.id||r.orderId}">Delete</button>`:'<button class="btn-approve" disabled>Approve</button><button class="btn-delete" data-id="${r.id||r.orderId}">Delete</button>'}</div></td>
           </tr>
         `;
         tbody.append(row);
@@ -131,6 +150,56 @@
       });
       $('.btn-reject').off('click').on('click', function(){
         const id = $(this).data('id'); rejectid(id, $(this));
+      });
+      $('.btn-delete').off('click').on('click', function(){
+        const id = $(this).data('id');
+        if(!confirm('Delete loan record '+id+'? This cannot be undone.')) return;
+        const btn = $(this);
+        btn.prop('disabled', true).text('Deleting...');
+        const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+        $.ajax({
+          url: '/api/admin/loan/' + encodeURIComponent(id),
+          method: 'DELETE',
+          headers: headers,
+          success: function(resp){
+            if(resp && (resp.code===1 || resp.success)){
+              // remove locally
+              const idx = all.findIndex(r=> (r.id||r.orderId)==id );
+              if(idx!==-1) all.splice(idx,1);
+              render(all);
+              alert('Deleted');
+            } else {
+              alert('Delete failed: ' + (resp && (resp.message||resp.error) || 'Unknown'));
+              btn.prop('disabled', false).text('Delete');
+            }
+          },
+          error: function(){
+            // try POST fallback
+            $.ajax({
+              url: '/api/admin/loan/delete',
+              method: 'POST',
+              data: { id: id },
+              headers: headers,
+              success: function(resp2){
+                if(resp2 && (resp2.code===1 || resp2.success)){
+                  const idx = all.findIndex(r=> (r.id||r.orderId)==id );
+                  if(idx!==-1) all.splice(idx,1);
+                  render(all);
+                  alert('Deleted');
+                } else {
+                  alert('Delete failed: ' + (resp2 && (resp2.message||resp2.error) || 'Unknown'));
+                  btn.prop('disabled', false).text('Delete');
+                }
+              },
+              error: function(){
+                alert('Delete request failed. Make sure you are logged in as admin.');
+                btn.prop('disabled', false).text('Delete');
+              }
+            });
+          }
+        });
       });
     }
 

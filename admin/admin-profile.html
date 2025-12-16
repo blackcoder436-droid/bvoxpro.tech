@@ -5,33 +5,54 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Profile</title>
   <style>
-    body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:#0d1117;color:#e6edf3;padding:24px}
-    .card{max-width:760px;margin:40px auto;background:#0f1720;border:1px solid #22272b;border-radius:8px;padding:20px}
-    h1{font-size:20px;margin-bottom:8px}
-    .row{display:flex;gap:12px;align-items:center}
-    .label{color:#8b949e;width:140px}
-    .value{color:#cfe3ff}
-    .back{display:inline-block;margin-top:18px;padding:8px 12px;border-radius:6px;background:#1f6feb;color:#fff;text-decoration:none}
-    .top-controls .back{margin-top:0}
-    .top-controls a.back, .top-controls button{display:inline-flex;align-items:center;height:36px}
-    .top-controls #topSaveBtn{padding:8px 12px;border-radius:6px;background:#198754;color:#fff;border:none;cursor:pointer}
-    .muted{color:#8b949e;font-size:13px}
-    pre{background:#07121a;padding:12px;border-radius:6px;overflow:auto}
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif; background:#0d1117; color:#e6edf3; padding:24px; }
+    .container { max-width:900px; margin:0 auto; }
+    .header-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:32px; background:#0f1720; border:1px solid #22272b; border-radius:8px; padding:16px 24px; flex-wrap:wrap; }
+    .back-btn { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:6px; background:transparent; border:1px solid #30363d; color:#e6edf3; text-decoration:none; font-size:18px; transition:all .2s; }
+    .back-btn:hover { background:#30363d; border-color:#58a6ff; }
+    .header-title { flex:1; text-align:center; font-size:20px; font-weight:600; color:#e6edf3; }
+    .header-actions { display:flex; gap:8px; align-items:center; }
+    .header-actions button { padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:600; font-size:14px; height:36px; display:inline-flex; align-items:center; }
+    #topSaveBtn { background:#238636; color:#fff; }
+    #topSaveBtn:hover { background:#2ea043; }
+    #logoutBtn { background:#da3633; color:#fff; }
+    #logoutBtn:hover { background:#f85149; }
+    .card { background:#0f1720; border:1px solid #22272b; border-radius:8px; padding:24px; margin-bottom:24px; }
+    .card-title { font-size:16px; font-weight:600; color:#e6edf3; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+    .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
+    .label { color:#8b949e; width:140px; font-size:14px; }
+    .value { color:#e6edf3; flex:1; }
+    .value input { width:100%; padding:8px 12px; border-radius:6px; border:1px solid #30363d; background:#0d1117; color:#e6edf3; font-family:inherit; }
+    .value input:focus { outline:none; border-color:#58a6ff; box-shadow:0 0 0 3px rgba(88,166,255,0.1); }
+    .wallet-row { display:grid; grid-template-columns:80px 1fr 40px; gap:12px; align-items:center; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #22272b; }
+    .wallet-row:last-child { border-bottom:none; }
+    .wallet-asset { color:#58a6ff; font-weight:600; font-size:12px; }
+    .wallet-address { color:#8b949e; font-family:Courier New, monospace; font-size:12px; word-break:break-all; }
+    .copy-btn { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:4px; border:1px solid #30363d; background:transparent; color:#58a6ff; cursor:pointer; font-size:14px; transition:all .2s; }
+    .copy-btn:hover { background:#30363d; border-color:#58a6ff; }
+    .copy-btn.copied { background:#238636; border-color:#238636; color:#fff; }
+    #formMsg { margin-top:12px; color:#3fb950; font-size:14px; }
+    #formMsg.error { color:#f85149; }
+    .muted { color:#8b949e; font-size:13px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <h1 id="pageTitle" style="margin:0">Admin Profile</h1>
-      <div class="top-controls" style="display:flex;align-items:center;gap:8px">
-        <a href="dashboard.html" class="back" id="topBack">← Back to Dashboard</a>
+  <div class="container">
+    <!-- Header Bar -->
+    <div class="header-bar">
+      <a href="dashboard.html" class="back-btn" id="topBack" title="Back to Dashboard">←</a>
+      <h1 id="pageTitle" class="header-title">Admin Profile</h1>
+      <div class="header-actions">
         <button id="topSaveBtn">Update Profile</button>
+        <button id="logoutBtn">Logout</button>
       </div>
     </div>
+
+    <!-- Content Area -->
     <div id="content">
       <p class="muted">Loading admin profile…</p>
     </div>
-    <!-- Back and Update controls moved to top-right -->
   </div>
 
   <script>
@@ -55,28 +76,48 @@
         const admin = data.admin;
         // Show Admin ID in the top header as requested
         const titleEl = document.getElementById('pageTitle');
-        if (titleEl) titleEl.textContent = `Admin Profile: ${admin.id}`;
+        if (titleEl) titleEl.textContent = `Admin Profile`;
 
         // Build editable profile form (telegram + wallets)
         const wallets = (admin.wallets && typeof admin.wallets === 'object') ? admin.wallets : {};
         const html = `
           <form id="profileForm">
-            <div class="row"><div class="label">Full name</div><div class="value"><input id="fullname" name="fullname" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${admin.fullname||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">Username</div><div class="value">${admin.username||'-'}</div></div>
-            <div class="row" style="margin-top:8px"><div class="label">Email</div><div class="value"><input id="email" name="email" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${admin.email||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">Telegram Username</div><div class="value"><input id="telegram" name="telegram" placeholder="e.g. BVOXTech_Support" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${admin.telegram||''}"></div></div>
+            <!-- Admin Information Card -->
+            <div class="card">
+              <div class="card-title">👤 Admin Information</div>
+              <div class="row">
+                <div class="label">ID</div>
+                <div class="value" style="color:#58a6ff;font-weight:600">Admin-${admin.id}</div>
+              </div>
+              <div class="row">
+                <div class="label">Full name</div>
+                <div class="value"><input id="fullname" name="fullname" value="${admin.fullname||''}"></div>
+              </div>
+              <div class="row">
+                <div class="label">Username</div>
+                <div class="value" style="color:#8b949e">${admin.username||'-'}</div>
+              </div>
+              <div class="row">
+                <div class="label">Email</div>
+                <div class="value"><input id="email" name="email" value="${admin.email||''}"></div>
+              </div>
+              <div class="row">
+                <div class="label">Telegram Username</div>
+                <div class="value"><input id="telegram" name="telegram" placeholder="e.g. BVOXTech_Support" value="${admin.telegram||''}"></div>
+              </div>
+            </div>
 
-            <hr style="margin:16px 0;border:none;border-top:1px solid #22272b">
-            <div style="margin-bottom:8px;color:#9fb4d9;font-weight:600">Your Wallet Addresses</div>
-
-            <div class="row" style="margin-top:8px"><div class="label">USDT</div><div class="value"><input id="wallet-USDT" name="wallet-USDT" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.USDT||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">BTC</div><div class="value"><input id="wallet-BTC" name="wallet-BTC" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.BTC||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">ETH</div><div class="value"><input id="wallet-ETH" name="wallet-ETH" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.ETH||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">USDC</div><div class="value"><input id="wallet-USDC" name="wallet-USDC" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.USDC||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">PYUSD</div><div class="value"><input id="wallet-PYUSD" name="wallet-PYUSD" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.PYUSD||''}"></div></div>
-            <div class="row" style="margin-top:8px"><div class="label">SOL</div><div class="value"><input id="wallet-SOL" name="wallet-SOL" style="width:100%;padding:8px;border-radius:6px;border:1px solid #22272b;background:#0b1220;color:#e6edf3" value="${wallets.SOL||''}"></div></div>
-
-                <div id="formMsg" style="margin-top:10px;color:#9fb4d9"></div>
+            <!-- Wallet Addresses Card -->
+            <div class="card">
+              <div class="card-title">💰 Your Wallet Addresses</div>
+              ${['USDT', 'BTC', 'ETH', 'USDC', 'PYUSD', 'SOL'].map(coin => `
+                <div class="row">
+                  <div class="label">${coin}</div>
+                  <div class="value"><input id="wallet-${coin}" name="wallet-${coin}" value="${wallets[coin]||''}" placeholder="Enter ${coin} wallet address"></div>
+                </div>
+              `).join('')}
+              <div id="formMsg"></div>
+            </div>
           </form>
         `;
         content.innerHTML = html;
@@ -103,12 +144,14 @@
                 body: JSON.stringify({ fullname, email, telegram, wallets })
               }).then(r=>r.json()).then(resp=>{
                 if(resp && resp.success){
-                  document.getElementById('formMsg').textContent = 'Profile updated.';
+                  document.getElementById('formMsg').textContent = 'Profile updated successfully.';
                 } else {
                   document.getElementById('formMsg').textContent = (resp && resp.error) ? resp.error : 'Failed to update';
+                  document.getElementById('formMsg').classList.add('error');
                 }
               }).catch(e=>{
                 document.getElementById('formMsg').textContent = 'Error saving profile';
+                document.getElementById('formMsg').classList.add('error');
               }).finally(()=>{ if(topBtn) { topBtn.disabled=false; topBtn.textContent='Update Profile'; } });
             }
 
@@ -125,6 +168,35 @@
                 saveProfile(topSave);
               }
             });
+
+            // Copy to clipboard utility
+            window.copyToClipboard = function(btn, text) {
+              if (!text) return;
+              navigator.clipboard.writeText(text).then(() => {
+                btn.classList.add('copied');
+                btn.textContent = '✓';
+                setTimeout(() => {
+                  btn.classList.remove('copied');
+                  btn.textContent = '📋';
+                }, 2000);
+              }).catch(err => console.error('Failed to copy:', err));
+            };
+
+            // Provide logout functionality on this page
+            function doLogout(){
+              if (confirm('Are you sure you want to logout?')){
+                localStorage.removeItem('adminName');
+                localStorage.removeItem('adminToken');
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+              }
+            }
+
+            // Expose as a global function in case other pages expect window.logout
+            window.logout = doLogout;
+
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) logoutBtn.addEventListener('click', doLogout);
 
       }).catch(err=>{
         localStorage.removeItem('adminToken'); sessionStorage.removeItem('adminToken');

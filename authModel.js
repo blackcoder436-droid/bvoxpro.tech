@@ -221,6 +221,31 @@ async function changePassword(adminId, oldPassword, newPassword) {
     return admins[adminIndex];
 }
 
+/**
+ * Delete admin (DB-first, JSON fallback)
+ */
+async function deleteAdmin(adminId) {
+    // Try DB first
+    if (isDbAvailable() && AdminModel) {
+        try {
+            const result = await AdminModel.findOneAndDelete({ id: adminId });
+            console.log('[authModel] deleteAdmin deleted from MongoDB:', adminId);
+            return result;
+        } catch (e) {
+            console.warn('[authModel] deleteAdmin DB delete failed; falling back to JSON:', e.message);
+        }
+    }
+
+    // JSON fallback
+    const admins = await getAllAdmins();
+    const adminIndex = admins.findIndex(a => a.id === adminId);
+    if (adminIndex === -1) return null;
+    
+    const deleted = admins.splice(adminIndex, 1)[0];
+    fs.writeFileSync(adminsFile, JSON.stringify(admins, null, 2));
+    return deleted;
+}
+
 module.exports = {
     registerAdmin,
     loginAdmin,
@@ -228,6 +253,7 @@ module.exports = {
     getAdminByUsername,
     getAllAdmins,
     changePassword,
+    deleteAdmin,
     generateToken,
     verifyToken,
     isDbAvailable,

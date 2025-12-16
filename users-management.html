@@ -113,15 +113,7 @@
         }
 
         .back-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 10px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-            text-decoration: none;
+            display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:6px; background:transparent; border:1px solid #30363d; color:#e6edf3; text-decoration:none; font-size:18px; transition:all .2s;
         }
 
         .back-btn:hover {
@@ -395,23 +387,23 @@
         <!-- Page Header -->
         <div class="page-header">
             <div class="header-top">
-                <div class="header-title">
-                    <span style="font-size: 32px;">👥</span>
+                <a href="admin/dashboard.html" class="back-btn" id="topBack" title="Back to Dashboard">←</a>
+                <div style="width:12px"></div>
+                <div class="header-title" style="display:flex;align-items:center;gap:12px;flex:1;">
+                    <span style="font-size:28px;display:inline-block;line-height:1;">👥</span>
                     <div>
-                        <h1>Users Management</h1>
-                        <p>Monitor and manage all registered users</p>
+                        <h1 style="margin:0;font-size:26px;">Users Management</h1>
+                        <p style="margin:4px 0 0;color:rgba(255,255,255,0.9);font-size:13px;">Monitor and manage all registered users</p>
                     </div>
                 </div>
-                <a href="admin/dashboard.html" class="back-btn">← Back to Dashboard</a>
-            </div>
 
-            <div class="header-controls">
-                <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="userSearch" placeholder="Search by user ID or wallet address..."
-                           onkeyup="filterUsers(this.value)">
+                <div class="header-controls" style="display:flex;gap:12px;align-items:center;">
+                    <div class="search-box" style="min-width:280px;">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="userSearch" placeholder="Search by user ID or wallet address..." onkeyup="filterUsers(this.value)">
+                    </div>
+                    <button class="filter-btn" onclick="toggleFilterPanel()">⚙️ Filter</button>
                 </div>
-                <button class="filter-btn" onclick="toggleFilterPanel()">⚙️ Filter</button>
             </div>
         </div>
 
@@ -598,7 +590,9 @@
                 const sol = (balances.sol || 0).toFixed(4);
 
                 const status = user.status || user.kycStatus || 'active';
-                const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+                const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString()
+                                    : (user.registered_at ? new Date(user.registered_at).toLocaleDateString()
+                                    : (user.created ? new Date(user.created).toLocaleDateString() : '-'));
 
                 const statusClass = status === 'active' ? 'active' : status === 'pending' ? 'pending' : 'inactive';
 
@@ -660,9 +654,28 @@
         }
 
         function deleteUser(userId) {
-            if (confirm(`Are you sure you want to delete user ${userId}?`)) {
-                alert(`Delete functionality for user ${userId} will be implemented soon.`);
-            }
+            if (!confirm(`Are you sure you want to delete user ${userId}? This action cannot be undone.`)) return;
+            const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+            if (!adminToken) { alert('Missing admin auth. Please login.'); return; }
+
+            fetch(`/api/users/${encodeURIComponent(userId)}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + adminToken }
+            }).then(async res => {
+                if (!res.ok) {
+                    const body = await res.json().catch(()=>({}));
+                    throw new Error(body && body.error ? body.error : ('HTTP ' + res.status));
+                }
+                return res.json();
+            }).then(json => {
+                alert(json.message || 'User deleted');
+                // Remove locally and rerender
+                const idx = allUsersData.findIndex(u => String(u.userid) === String(userId) || String(u.uid) === String(userId));
+                if (idx !== -1) { allUsersData.splice(idx,1); renderTable(allUsersData); updateStats(); }
+            }).catch(err => {
+                console.error('Failed to delete user:', err);
+                alert('Failed to delete user: ' + (err.message || err));
+            });
         }
 
         function toggleFilterPanel() {
@@ -671,11 +684,10 @@
 
         /* Edit modal for toggling force_trade_win */
         function openEditModal(userId) {
-            // Find user data
             const user = allUsersData.find(u => String(u.userid) === String(userId) || String(u.uid) === String(userId));
             if (!user) { alert('User not found'); return; }
 
-            // Create modal
+            const balances = user.balances || {};
             const modal = document.createElement('div');
             modal.id = 'edit-user-modal';
             modal.style.position = 'fixed';
@@ -689,10 +701,18 @@
             modal.style.justifyContent = 'center';
             modal.style.zIndex = 99999;
 
-            const bodyHtml = `
-                <div style="background:#0d1117;color:#e6edf3;padding:20px;border-radius:10px;min-width:340px;">
+            modal.innerHTML = `
+                <div style="background:#0d1117;color:#e6edf3;padding:20px;border-radius:10px;min-width:380px;max-width:600px;">
                     <h3 style="margin-bottom:8px;">Edit User ${userId}</h3>
-                    <p style="color:#8b949e;margin-bottom:12px;">Toggle admin flags for this user</p>
+                    <p style="color:#8b949e;margin-bottom:12px;">Adjust balances and admin flags for this user</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                        <label>USDT<br><input id="bal_usdt" type="number" step="0.01" value="${(balances.usdt||0)}" style="width:100%;padding:8px;border-radius:6px;background:#0b1220;border:1px solid #222;color:#e6edf3"></label>
+                        <label>USDC<br><input id="bal_usdc" type="number" step="0.01" value="${(balances.usdc||0)}" style="width:100%;padding:8px;border-radius:6px;background:#0b1220;border:1px solid #222;color:#e6edf3"></label>
+                        <label>BTC<br><input id="bal_btc" type="number" step="0.0001" value="${(balances.btc||0)}" style="width:100%;padding:8px;border-radius:6px;background:#0b1220;border:1px solid #222;color:#e6edf3"></label>
+                        <label>ETH<br><input id="bal_eth" type="number" step="0.0001" value="${(balances.eth||0)}" style="width:100%;padding:8px;border-radius:6px;background:#0b1220;border:1px solid #222;color:#e6edf3"></label>
+                        <label>PYUSD<br><input id="bal_pyusd" type="number" step="0.01" value="${(balances.pyusd||0)}" style="width:100%;padding:8px;border-radius:6px;background:#0b1220;border:1px solid #222;color:#e6edf3"></label>
+                        <label>SOL<br><input id="bal_sol" type="number" step="0.0001" value="${(balances.sol||0)}" style="width:100%;padding:8px;border-radius:6px;background:#0b1220;border:1px solid #222;color:#e6edf3"></label>
+                    </div>
                     <label style="display:block;margin-bottom:8px;">
                         <input type="checkbox" id="forceTradeWinCheckbox" ${user.force_trade_win ? 'checked' : ''}> Force Trade Win
                     </label>
@@ -703,34 +723,54 @@
                 </div>
             `;
 
-            modal.innerHTML = bodyHtml;
             document.body.appendChild(modal);
 
             document.getElementById('cancelEditBtn').addEventListener('click', () => { modal.remove(); });
-            document.getElementById('saveEditBtn').addEventListener('click', () => {
-                const checked = document.getElementById('forceTradeWinCheckbox').checked;
-                // Call admin endpoint to set flag
-                $.ajax({
-                    url: '/api/admin/set-user-flag',
-                    method: 'POST',
-                    data: {
-                        user_id: userId,
-                        flag: 'force_trade_win',
-                        value: checked
-                    },
-                    success: function(resp) {
-                        if (resp && resp.success) {
-                            alert('User updated successfully');
-                            // Update local copy and rerender
-                            const idx = allUsersData.findIndex(u => String(u.userid) === String(userId) || String(u.uid) === String(userId));
-                            if (idx !== -1) { allUsersData[idx].force_trade_win = checked; renderTable(allUsersData); }
-                            modal.remove();
-                        } else {
-                            alert('Failed to update user');
-                        }
-                    },
-                    error: function(err) { alert('Failed to update user'); }
-                });
+
+            document.getElementById('saveEditBtn').addEventListener('click', async () => {
+                const updatedBalances = {
+                    usdt: parseFloat(document.getElementById('bal_usdt').value) || 0,
+                    usdc: parseFloat(document.getElementById('bal_usdc').value) || 0,
+                    btc: parseFloat(document.getElementById('bal_btc').value) || 0,
+                    eth: parseFloat(document.getElementById('bal_eth').value) || 0,
+                    pyusd: parseFloat(document.getElementById('bal_pyusd').value) || 0,
+                    sol: parseFloat(document.getElementById('bal_sol').value) || 0
+                };
+                const forceWin = document.getElementById('forceTradeWinCheckbox').checked;
+
+                const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+                if (!adminToken) { alert('Missing admin auth. Please login again.'); return; }
+
+                try {
+                    // Update balances via API
+                    const resp = await fetch(`/api/users/${userId}/balances`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+                        body: JSON.stringify({ balances: updatedBalances })
+                    });
+                    if (!resp.ok) throw new Error('Failed to update balances (HTTP ' + resp.status + ')');
+                    const json = await resp.json();
+
+                    // Update force_trade_win flag via admin endpoint (existing)
+                    await fetch('/api/admin/set-user-flag', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'Bearer ' + adminToken },
+                        body: `user_id=${encodeURIComponent(userId)}&flag=force_trade_win&value=${forceWin}`
+                    });
+
+                    alert('User updated successfully');
+                    // Update local copy and rerender
+                    const idx = allUsersData.findIndex(u => String(u.userid) === String(userId) || String(u.uid) === String(userId));
+                    if (idx !== -1) {
+                        allUsersData[idx].balances = Object.assign({}, allUsersData[idx].balances || {}, updatedBalances);
+                        allUsersData[idx].force_trade_win = forceWin;
+                        renderTable(allUsersData);
+                    }
+                    modal.remove();
+                } catch (e) {
+                    console.error('Failed to save user edits:', e);
+                    alert('Failed to save changes: ' + (e.message || e));
+                }
             });
         }
     </script>

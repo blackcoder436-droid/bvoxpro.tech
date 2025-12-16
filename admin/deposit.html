@@ -32,31 +32,28 @@
             align-items: center;
             gap: 12px;
             margin-bottom: 0;
+            position: relative;
         }
 
         .back-btn {
-            display: inline-block;
-            text-decoration: none;
-            color: rgba(255,255,255,0.95);
-            background: rgba(255,255,255,0.06);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-weight: 700;
-            margin-right: 8px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:36px;
+            height:36px;
+            border-radius:6px;
+            background:transparent;
+            border:1px solid #30363d;
+            color:#e6edf3;
+            text-decoration:none;
+            font-size:18px;
+            transition:all .2s;
         }
-        .back-btn:hover { background: rgba(255,255,255,0.12); }
 
-        .back-btn {
-            display: inline-block;
-            text-decoration: none;
-            color: rgba(255,255,255,0.95);
-            background: rgba(255,255,255,0.06);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-weight: 700;
-            margin-right: 8px;
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
         }
-        .back-btn:hover { background: rgba(255,255,255,0.12); }
 
         .header h1 {
             font-size: 24px;
@@ -65,6 +62,16 @@
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+
+        .header .title-wrapper {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: center;
         }
 
         .header .icon {
@@ -137,6 +144,8 @@
             border: 1px solid #404a5e;
             border-radius: 0 0 12px 12px;
             overflow: hidden;
+            max-width: 1100px;
+            margin: 24px auto;
         }
 
         table {
@@ -267,12 +276,12 @@
         }
 
         .btn-reject {
-            background: #da3633;
-            color: white;
+            background: #ffb020;
+            color: #111;
         }
 
         .btn-reject:hover {
-            background: #f85149;
+            background: #ffc84a;
         }
 
         .btn-view {
@@ -389,6 +398,12 @@
             max-width: 100%;
             max-height: 80vh;
             border-radius: 8px;
+        }
+
+        /* proof column removed - thumbnails disabled */
+
+        .done-badge {
+            display:inline-block;padding:6px 10px;border-radius:6px;background:rgba(76,175,80,0.15);color:#4caf50;font-weight:700;font-size:12px;text-transform:none;
         }
 
         /* Mobile-First Responsive Design */
@@ -606,9 +621,11 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <a href="/admin/dashboard.html" class="back-btn">← Dashboard</a>
-            <span class="icon">📊</span>
-            <h1>Deposits List</h1>
+            <a href="/admin/dashboard.html" class="back-btn">←</a>
+            <div class="title-wrapper">
+                <span class="icon">📊</span>
+                <h1>Deposits List</h1>
+            </div>
         </div>
 
         <!-- Filters -->
@@ -647,16 +664,16 @@
         <div class="table-wrapper">
             <table id="depositsTable">
                 <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>USER</th>
-                        <th>COIN</th>
-                        <th>AMOUNT</th>
-                        <th>ADDRESS</th>
-                        <th>STATUS</th>
-                        <th>DATE</th>
-                        <th>ACTION</th>
-                    </tr>
+                        <tr>
+                            <th>ID</th>
+                            <th>USER</th>
+                            <th>COIN</th>
+                            <th>AMOUNT</th>
+                            <th>ADDRESS</th>
+                            <th>STATUS</th>
+                            <th>DATE</th>
+                            <th>ACTION</th>
+                        </tr>
                 </thead>
                 <tbody id="depositsBody">
                     <tr>
@@ -717,16 +734,32 @@
                 },
                 error: function(err) {
                     console.error('Failed to load topup records from MongoDB:', err);
-                    $('#depositsBody').html(`
-                        <tr>
-                            <td colspan="9">
-                                <div class="no-data">
-                                    <div class="no-data-icon">❌</div>
-                                    <div>Failed to load deposits from database</div>
-                                </div>
-                            </td>
-                        </tr>
-                    `);
+                    console.warn('Attempting legacy fallback /api/topup-records...');
+                    // Try legacy public endpoint (some setups expose this without admin auth)
+                    $.ajax({
+                        url: '/api/topup-records',
+                        method: 'GET',
+                        dataType: 'json',
+                        success: function(legacyResp) {
+                            const data = legacyResp.records || legacyResp || [];
+                            allRecords = data || [];
+                            filteredRecords = [...allRecords];
+                            displayPage(1);
+                        },
+                        error: function(legacyErr) {
+                            console.error('Legacy fallback failed:', legacyErr);
+                            $('#depositsBody').html(`
+                                <tr>
+                                    <td colspan="8">
+                                        <div class="no-data">
+                                            <div class="no-data-icon">❌</div>
+                                            <div>Failed to load deposits from database</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `);
+                        }
+                    });
                 }
             });
         }
@@ -771,6 +804,23 @@
                     minute: '2-digit'
                 });
 
+                // Determine action area: pending => Approve/Reject/Delete; approved/completed => Done + Delete; rejected => View/Delete
+                let actionHtml = '';
+                const st = (record.status || 'pending').toLowerCase();
+                if (st === 'pending') {
+                    actionHtml = `
+                        <button class="btn-approve" onclick="updateStatus('${record.id}', 'approved')">Approve</button>
+                        <button class="btn-reject" onclick="updateStatus('${record.id}', 'rejected')">Reject</button>
+                        <button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>
+                    `;
+                } else if (st === 'approved' || st === 'completed' || st === 'complete' || st === 'done') {
+                    actionHtml = `<span class="done-badge">Done</span><button class="btn-delete" style="margin-left:8px" onclick="deleteRecord('${record.id}')">Delete</button>`;
+                } else if (st === 'rejected') {
+                    actionHtml = `<button class="btn-view" onclick="showImage('${record.photo_url || ''}')">View</button><button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>`;
+                } else {
+                    actionHtml = `<button class="btn-view" onclick="showImage('${record.photo_url || ''}')">View</button><button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>`;
+                }
+
                 const row = `
                     <tr>
                         <td data-label="ID"><div class="id-cell">${record.display_id || record.id}</div></td>
@@ -781,16 +831,7 @@
                         <td data-label="Status"><span class="status-badge ${statusClass}">${record.status || 'pending'}</span></td>
                         <td data-label="Date"><div class="date-cell">${createdDate}</div></td>
                         <td data-label="Action">
-                            <div class="action-buttons">
-                                ${record.status === 'pending' ? `
-                                    <button class="btn-approve" onclick="updateStatus('${record.id}', 'approved')">Approve</button>
-                                    <button class="btn-reject" onclick="updateStatus('${record.id}', 'rejected')">Reject</button>
-                                    <button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>
-                                ` : `
-                                    <button class="btn-view" onclick="showImage('${record.photo_url || ''}')">View</button>
-                                    <button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>
-                                `}
-                            </div>
+                            <div class="action-buttons">${actionHtml}</div>
                         </td>
                     </tr>
                 `;
@@ -855,43 +896,34 @@
             });
         }
 
-        // Update record status
+        // Update record status (optimistic UI): apply change immediately and revert on failure
         function updateStatus(recordId, newStatus) {
-            const record = allRecords.find(r => r.id === recordId);
+            const record = allRecords.find(r => r.id === recordId || r._id === recordId);
             if (!record) {
                 alert('Record not found');
                 return;
             }
 
-            // Show confirmation
-            if (!confirm(`Are you sure you want to ${newStatus} this deposit?`)) {
-                return;
-            }
+            if (!confirm(`Are you sure you want to ${newStatus} this deposit?`)) return;
 
-            // Get the button element
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Processing...';
+            // Optimistic update: change UI immediately
+            const prevStatus = record.status;
+            const normalized = String(newStatus).toLowerCase();
+            if (normalized === 'approved') record.status = 'completed';
+            else if (normalized === 'rejected') record.status = 'rejected';
+
+            const idxAll = allRecords.findIndex(r => r.id === recordId || r._id === recordId);
+            if (idxAll !== -1) allRecords[idxAll] = record;
+            filteredRecords = filteredRecords.map(r => (r.id === recordId || r._id === recordId) ? record : r);
+            displayPage(currentPage);
 
             const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-            
-            // Determine API endpoint (use MongoDB endpoints)
-            let apiUrl;
-            let displayStatus;
-            if (newStatus === 'approved') {
-                apiUrl = '/api/admin/topup/approve-mongo';
-                displayStatus = 'approved';
-            } else if (newStatus === 'rejected') {
-                apiUrl = '/api/admin/topup/reject-mongo';
-                displayStatus = 'rejected';
-            } else {
-                button.disabled = false;
-                button.textContent = originalText;
-                return;
-            }
+            let apiUrl = null;
+            if (normalized === 'approved') apiUrl = '/api/admin/topup/approve-mongo';
+            else if (normalized === 'rejected') apiUrl = '/api/admin/topup/reject-mongo';
+            if (!apiUrl) return;
 
-            // Call MongoDB API with string ID
+            // Send request in background; if it fails revert the optimistic change
             $.ajax({
                 url: apiUrl,
                 method: 'PUT',
@@ -899,27 +931,26 @@
                 headers: token ? { 'Authorization': 'Bearer ' + token } : {},
                 data: JSON.stringify({ id: recordId }),
                 success: function(response) {
-                    if (response.success) {
-                        // Update local state
-                        record.status = newStatus === 'approved' ? 'complete' : newStatus;
-                        filteredRecords = filteredRecords.map(r => (r.id === recordId || r._id === mongoId) ? record : r);
-                        
-                        console.log(`✓ Successfully ${newStatus} record ${recordId}`);
-                        console.log('API Response:', response);
-                        
-                        alert(`Deposit ${newStatus === 'approved' ? 'approved' : 'rejected'} successfully!`);
-                        displayPage(currentPage);
+                    if (response && response.success) {
+                        // server confirmed; leave optimistic UI as-is
+                        console.log('Server confirmed status change for', recordId);
                     } else {
-                        alert('Error: ' + (response.error || response.message || 'Operation failed'));
+                        // revert
+                        record.status = prevStatus;
+                        if (idxAll !== -1) allRecords[idxAll] = record;
+                        filteredRecords = filteredRecords.map(r => (r.id === recordId || r._id === recordId) ? record : r);
+                        displayPage(currentPage);
+                        alert('Server error: ' + ((response && (response.error || response.message)) || 'Operation failed'));
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error(`✗ Error updating record ${recordId}:`, error);
-                    alert('Could not connect to database');
-                },
-                complete: function() {
-                    button.disabled = false;
-                    button.textContent = originalText;
+                    console.error('Error updating record:', error);
+                    // revert UI
+                    record.status = prevStatus;
+                    if (idxAll !== -1) allRecords[idxAll] = record;
+                    filteredRecords = filteredRecords.map(r => (r.id === recordId || r._id === recordId) ? record : r);
+                    displayPage(currentPage);
+                    alert('Network error: could not update record');
                 }
             });
         }

@@ -34,6 +34,26 @@
             margin-bottom: 0;
         }
 
+        .back-btn {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:36px;
+            height:36px;
+            border-radius:6px;
+            background:transparent;
+            border:1px solid #30363d;
+            color:#e6edf3;
+            text-decoration:none;
+            font-size:18px;
+            transition:all .2s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
         .header h1 {
             font-size: 24px;
             font-weight: 700;
@@ -45,6 +65,16 @@
 
         .header .icon {
             font-size: 28px;
+        }
+
+        .header .title-wrapper {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: center;
         }
 
         /* Filters */
@@ -262,6 +292,48 @@
 
         .btn-close:hover {
             background: #f85149;
+        }
+        /* Done and Delete buttons styling */
+        .btn-done {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            transition: all 0.2s;
+            background: #16a34a; /* green */
+            color: white;
+        }
+
+        .btn-done:hover {
+            background: #059669;
+        }
+
+        .btn-delete {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            transition: all 0.2s;
+            background: #dc2626; /* red */
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #ef4444;
+        }
+
+        .done-badge {
+            display: inline-block;
+            padding: 6px 10px;
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 12px;
         }
 
         .no-data {
@@ -518,9 +590,11 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <a href="/admin/dashboard.html" class="back-btn">← Dashboard</a>
-            <span class="icon">📑</span>
-            <h1>Contract Records</h1>
+            <a href="/admin/dashboard.html" class="back-btn">←</a>
+            <div class="title-wrapper">
+                <span class="icon">📑</span>
+                <h1>Contract Records</h1>
+            </div>
         </div>
 
         <!-- Filters -->
@@ -744,8 +818,8 @@
                         <td><div class="date-cell">${createdDate}</div></td>
                         <td>
                             <div class="action-buttons">
-                                <button class="btn-view">View</button>
-                                ${record.settlement_applied ? '' : `<button class="btn-win" data-id="${record.id}" data-action="win">Set Win</button><button class="btn-loss" data-id="${record.id}" data-action="loss">Set Loss</button>`}
+                                <button class="btn-done" data-id="${record.id}">Done</button>
+                                <button class="btn-delete" data-id="${record.id}">Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -754,59 +828,71 @@
                 tbody.append(row);
             });
 
-            // Bind Set Win / Set Loss buttons after rows appended
-            tbody.find('.btn-win').off('click').on('click', function() {
+            // Bind Done / Delete buttons after rows appended
+            tbody.find('.btn-done').off('click').on('click', function() {
                 const id = $(this).data('id');
-                if (!confirm('Apply WIN settlement for this trade?')) return;
-                $(this).prop('disabled', true);
-                const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-                if (!adminToken) {
-                    alert('Admin token not found. Please login to the admin panel before applying settlements.');
-                    $(this).prop('disabled', false);
-                    return;
+                if (!confirm('Mark this contract record as Done?')) return;
+                // Optimistic UI update: mark status as completed locally and disable the button
+                const btn = $(this);
+                btn.prop('disabled', true);
+                // Update in-memory record and UI
+                const idx = allRecords.findIndex(r => String(r.id) === String(id));
+                if (idx !== -1) {
+                    allRecords[idx].status = 'completed';
                 }
-                $.ajax({
-                    url: '/api/trade/setordersy',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    headers: { 'Authorization': 'Bearer ' + (adminToken || '') },
-                    data: JSON.stringify({ id: id, shuying: 1 }),
-                    success: function(resp) {
-                        alert('WIN settlement applied');
-                        loadContractRecords();
-                    },
-                    error: function(xhr) {
-                        console.error('Error applying WIN settlement:', xhr && xhr.responseText ? xhr.responseText : xhr);
-                        const msg = xhr && xhr.responseJSON && xhr.responseJSON.data ? xhr.responseJSON.data : (xhr && xhr.responseText) || 'Failed to apply settlement';
-                        alert(msg);
-                    }
-                });
+                // Replace Done button with badge
+                btn.replaceWith('<span class="done-badge">Done</span>');
             });
 
-            tbody.find('.btn-loss').off('click').on('click', function() {
+            tbody.find('.btn-delete').off('click').on('click', function() {
                 const id = $(this).data('id');
-                if (!confirm('Apply LOSS settlement for this trade?')) return;
-                $(this).prop('disabled', true);
-                const adminToken2 = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-                if (!adminToken2) {
-                    alert('Admin token not found. Please login to the admin panel before applying settlements.');
-                    $(this).prop('disabled', false);
-                    return;
-                }
+                if (!confirm('Are you sure you want to delete this contract record? This action will remove it from the list.')) return;
+                const btn = $(this);
+                btn.prop('disabled', true).text('Deleting...');
+
+                const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+                const headers = {};
+                if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+
+                // Try DELETE first
                 $.ajax({
-                    url: '/api/trade/setordersy',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    headers: { 'Authorization': 'Bearer ' + (adminToken2 || '') },
-                    data: JSON.stringify({ id: id, shuying: 2 }),
+                    url: '/api/admin/contract/' + encodeURIComponent(id),
+                    method: 'DELETE',
+                    headers: headers,
                     success: function(resp) {
-                        alert('LOSS settlement applied');
-                        loadContractRecords();
+                        if (resp && resp.code === 1) {
+                            const idx = allRecords.findIndex(r => String(r.id) === String(id));
+                            if (idx !== -1) allRecords.splice(idx, 1);
+                            filteredRecords = [...allRecords];
+                            displayPage(currentPage);
+                        } else {
+                            alert('Delete failed: ' + (resp && resp.message ? resp.message : 'Unknown'));
+                            btn.prop('disabled', false).text('Delete');
+                        }
                     },
                     error: function(xhr) {
-                        console.error('Error applying LOSS settlement:', xhr && xhr.responseText ? xhr.responseText : xhr);
-                        const msg = xhr && xhr.responseJSON && xhr.responseJSON.data ? xhr.responseJSON.data : (xhr && xhr.responseText) || 'Failed to apply settlement';
-                        alert(msg);
+                        // Try POST fallback
+                        $.ajax({
+                            url: '/api/admin/contract/delete',
+                            method: 'POST',
+                            data: { id: id },
+                            headers: headers,
+                            success: function(resp2) {
+                                if (resp2 && resp2.code === 1) {
+                                    const idx = allRecords.findIndex(r => String(r.id) === String(id));
+                                    if (idx !== -1) allRecords.splice(idx, 1);
+                                    filteredRecords = [...allRecords];
+                                    displayPage(currentPage);
+                                } else {
+                                    alert('Delete failed: ' + (resp2 && resp2.message ? resp2.message : 'Unknown'));
+                                    btn.prop('disabled', false).text('Delete');
+                                }
+                            },
+                            error: function() {
+                                alert('Delete request failed. Please try again.');
+                                btn.prop('disabled', false).text('Delete');
+                            }
+                        });
                     }
                 });
             });

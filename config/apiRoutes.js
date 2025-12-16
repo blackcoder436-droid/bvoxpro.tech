@@ -92,6 +92,69 @@ router.post(['/api/Trade/gettradlist', '/api/trade/gettradlist'], (req, res) => 
     }
 });
 
+// DELETE /api/admin/contract/:id - delete a single contract/trade record
+router.delete('/api/admin/contract/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        // Basic auth check: require Authorization header with Bearer token
+        const authHeader = req.headers.authorization || req.get('Authorization');
+        if (!authHeader) return res.status(401).json({ code: 0, message: 'Missing authorization' });
+
+        const mongoose = require('mongoose');
+        const Trade = require('../models/Trade');
+
+        let deleted = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await Trade.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            // Try deleting by custom id field
+            const result = await Trade.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ code: 1, message: 'Deleted' });
+            }
+            return res.status(404).json({ code: 0, message: 'Record not found' });
+        }
+
+        return res.json({ code: 1, message: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/contract/delete] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
+// POST fallback for clients that cannot send DELETE
+router.post('/api/admin/contract/delete', async (req, res) => {
+    try {
+        const id = req.body.id || req.body._id;
+        const authHeader = req.headers.authorization || req.get('Authorization');
+        if (!authHeader) return res.status(401).json({ code: 0, message: 'Missing authorization' });
+
+        const mongoose = require('mongoose');
+        const Trade = require('../models/Trade');
+
+        let deleted = null;
+        if (id && mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await Trade.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await Trade.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ code: 1, message: 'Deleted' });
+            }
+            return res.status(404).json({ code: 0, message: 'Record not found' });
+        }
+
+        return res.json({ code: 1, message: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/contract/delete-fallback] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
 // ============= USER ENDPOINTS =============
 
 router.get('/api/users/:userId', async (req, res) => {
@@ -196,6 +259,72 @@ router.get('/api/admin/list', async (req, res) => {
         return res.json({ success: true, admins });
     } catch (e) {
         console.error('[admin/list] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// DELETE /api/admin/delete/:adminId
+router.delete('/api/admin/delete/:adminId', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const { adminId } = req.params;
+        if (!adminId) return res.status(400).json({ success: false, error: 'Missing adminId' });
+        
+        // Delete from database
+        const result = await db.deleteAdmin(adminId);
+        if (!result) return res.status(404).json({ success: false, error: 'Admin not found' });
+        
+        // Also try to delete from JSON file if exists
+        try {
+            await auth.deleteAdmin(adminId);
+        } catch (e) {
+            console.warn('[admin/delete] warning deleting from JSON:', e.message);
+        }
+        
+        return res.json({ success: true, message: `Admin ${adminId} deleted successfully` });
+    } catch (e) {
+        console.error('[admin/delete] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Legacy/compatibility: accept POST to delete admin (some clients or proxies block DELETE)
+router.post('/api/admin/delete/:adminId', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const adminId = req.params.adminId || req.body.adminId || req.body.admin_id;
+        if (!adminId) return res.status(400).json({ success: false, error: 'Missing adminId' });
+
+        const result = await db.deleteAdmin(adminId);
+        if (!result) return res.status(404).json({ success: false, error: 'Admin not found' });
+
+        try { await auth.deleteAdmin(adminId); } catch (e) { console.warn('[admin/delete POST] warning deleting from JSON:', e.message); }
+
+        return res.json({ success: true, message: `Admin ${adminId} deleted successfully` });
+    } catch (e) {
+        console.error('[admin/delete POST] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Also accept POST /api/admin/delete with body { adminId } for very old clients
+router.post('/api/admin/delete', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const adminId = req.body.adminId || req.body.admin_id || req.body.id;
+        if (!adminId) return res.status(400).json({ success: false, error: 'Missing adminId' });
+
+        const result = await db.deleteAdmin(adminId);
+        if (!result) return res.status(404).json({ success: false, error: 'Admin not found' });
+
+        try { await auth.deleteAdmin(adminId); } catch (e) { console.warn('[admin/delete POST body] warning deleting from JSON:', e.message); }
+
+        return res.json({ success: true, message: `Admin ${adminId} deleted successfully` });
+    } catch (e) {
+        console.error('[admin/delete POST body] error:', e && e.message);
         return res.status(500).json({ success: false, error: e.message });
     }
 });
@@ -324,6 +453,31 @@ router.get('/api/admin/users', async (req, res) => {
         return res.json({ success: true, users });
     } catch (e) {
         console.error('[admin/users] error:', e && e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// DELETE /api/users/:userId - allow admin to remove a user
+router.delete('/api/users/:userId', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+        const userId = req.params.userId;
+        console.log('[users/delete] request by admin:', admin && (admin.id || admin.adminId || admin._id || admin.username), 'target user:', userId);
+        if (!userId) return res.status(400).json({ success: false, error: 'Missing userId' });
+
+        // Delete the user record
+        const result = await db.deleteUser(userId);
+        if (!result) {
+            console.warn('[users/delete] user not found:', userId);
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        // Optionally: remove related records (topups, withdrawals, etc.) — not implemented here
+
+        return res.json({ success: true, message: `User ${userId} deleted` });
+    } catch (e) {
+        console.error('[users/delete] error:', e && e.message);
         return res.status(500).json({ success: false, error: e.message });
     }
 });
@@ -584,6 +738,66 @@ router.get('/api/admin/arbitrage/records', async (req, res) => {
     } catch (e) {
         console.error('[admin/arbitrage/records] error:', e && e.message);
         return res.status(500).json({ code: 0, data: [], message: e.message });
+    }
+});
+
+// DELETE /api/admin/arbitrage/:id - delete a single arbitrage subscription
+router.delete('/api/admin/arbitrage/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const authHeader = req.headers.authorization || req.get('Authorization');
+        if (!authHeader) return res.status(401).json({ code: 0, message: 'Missing authorization' });
+
+        const mongoose = require('mongoose');
+        const ArbitrageSubscription = require('../models/ArbitrageSubscription');
+
+        let deleted = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await ArbitrageSubscription.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await ArbitrageSubscription.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ code: 1, message: 'Deleted' });
+            }
+            return res.status(404).json({ code: 0, message: 'Record not found' });
+        }
+
+        return res.json({ code: 1, message: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/arbitrage/delete] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
+// POST fallback for arbitrage delete
+router.post('/api/admin/arbitrage/delete', async (req, res) => {
+    try {
+        const id = req.body.id || req.body._id;
+        const authHeader = req.headers.authorization || req.get('Authorization');
+        if (!authHeader) return res.status(401).json({ code: 0, message: 'Missing authorization' });
+
+        const mongoose = require('mongoose');
+        const ArbitrageSubscription = require('../models/ArbitrageSubscription');
+
+        let deleted = null;
+        if (id && mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await ArbitrageSubscription.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await ArbitrageSubscription.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ code: 1, message: 'Deleted' });
+            }
+            return res.status(404).json({ code: 0, message: 'Record not found' });
+        }
+
+        return res.json({ code: 1, message: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/arbitrage/delete-fallback] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
     }
 });
 
@@ -1541,6 +1755,70 @@ router.post('/api/admin/mine/redeem/reject', async (req, res) => {
     }
 });
 
+// DELETE /api/admin/mining/:id - delete a single mining record
+router.delete('/api/admin/mining/:id', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ code: 0, message: 'Unauthorized' });
+
+        const id = req.params.id;
+        if (!id) return res.status(400).json({ code: 0, message: 'Missing id' });
+
+        const mongoose = require('mongoose');
+        const Mining = require('../models/Mining');
+
+        let deleted = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await Mining.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await Mining.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ code: 1, message: 'Deleted' });
+            }
+            return res.status(404).json({ code: 0, message: 'Record not found' });
+        }
+
+        return res.json({ code: 1, message: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/mining/delete] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
+// POST fallback for clients that cannot send DELETE
+router.post('/api/admin/mining/delete', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ code: 0, message: 'Unauthorized' });
+
+        const id = req.body.id || req.body.orderId || req.body._id;
+        if (!id) return res.status(400).json({ code: 0, message: 'Missing id' });
+
+        const mongoose = require('mongoose');
+        const Mining = require('../models/Mining');
+
+        let deleted = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await Mining.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await Mining.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ code: 1, message: 'Deleted' });
+            }
+            return res.status(404).json({ code: 0, message: 'Record not found' });
+        }
+
+        return res.json({ code: 1, message: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/mining/delete-fallback] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
 // ============= LOAN ENDPOINTS =============
 
 router.post('/api/loan', async (req, res) => {
@@ -1653,6 +1931,70 @@ router.post('/api/admin/loan/reject', async (req, res) => {
         return res.json({ success: true, code: 1, data: loan });
     } catch (e) {
         console.error('[admin/loan/reject] error:', e);
+        return res.status(500).json({ success: false, error: String(e && e.message ? e.message : e) });
+    }
+});
+
+// DELETE /api/admin/loan/:id - delete a loan record
+router.delete('/api/admin/loan/:id', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const id = req.params.id;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
+
+        const Loan = require('../models/Loan');
+        const mongoose = require('mongoose');
+
+        let deleted = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await Loan.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await Loan.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ success: true, code: 1, data: 'Deleted' });
+            }
+            return res.status(404).json({ success: false, error: 'Record not found' });
+        }
+
+        return res.json({ success: true, code: 1, data: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/loan/delete] error:', e);
+        return res.status(500).json({ success: false, error: String(e && e.message ? e.message : e) });
+    }
+});
+
+// POST fallback for deleting loan records
+router.post('/api/admin/loan/delete', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const id = req.body.id || req.body.orderId || req.body.loan_id;
+        if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
+
+        const Loan = require('../models/Loan');
+        const mongoose = require('mongoose');
+
+        let deleted = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deleted = await Loan.findByIdAndDelete(id);
+        }
+
+        if (!deleted) {
+            const result = await Loan.deleteOne({ id: id });
+            if (result && result.deletedCount && result.deletedCount > 0) {
+                return res.json({ success: true, code: 1, data: 'Deleted' });
+            }
+            return res.status(404).json({ success: false, error: 'Record not found' });
+        }
+
+        return res.json({ success: true, code: 1, data: 'Deleted' });
+    } catch (e) {
+        console.error('[admin/loan/delete-fallback] error:', e);
         return res.status(500).json({ success: false, error: String(e && e.message ? e.message : e) });
     }
 });

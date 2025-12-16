@@ -34,6 +34,10 @@
             margin-bottom: 0;
         }
 
+        .header {
+            position: relative;
+        }
+
         .back-btn {
             display: inline-block;
             text-decoration: none;
@@ -57,6 +61,16 @@
 
         .header .icon {
             font-size: 28px;
+        }
+
+        .header .title-wrapper {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: center;
         }
 
         /* Filters */
@@ -286,6 +300,45 @@
 
         .btn-stop:hover {
             background: #f85149;
+        }
+
+        /* Done and Delete buttons styling (match contract page) */
+        .btn-done {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            transition: all 0.2s;
+            background: #16a34a; /* green */
+            color: white;
+        }
+
+        .btn-done:hover { background: #059669; }
+
+        .btn-delete {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            transition: all 0.2s;
+            background: #dc2626; /* red */
+            color: white;
+        }
+
+        .btn-delete:hover { background: #ef4444; }
+
+        .done-badge {
+            display: inline-block;
+            padding: 6px 10px;
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 12px;
         }
 
         .no-data {
@@ -539,6 +592,25 @@
                 padding: 40px 20px;
             }
         }
+        .back-btn {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:36px;
+            height:36px;
+            border-radius:6px;
+            background:transparent;
+            border:1px solid #30363d;
+            color:#e6edf3;
+            text-decoration:none;
+            font-size:18px;
+            transition:all .2s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
     </style>
 </head>
 <body>
@@ -557,9 +629,11 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <a href="/admin/dashboard.html" class="back-btn">← Dashboard</a>
-            <span class="icon">🤖</span>
-            <h1>AI Arbitrage Records</h1>
+            <a href="/admin/dashboard.html" class="back-btn">←</a>
+            <div class="title-wrapper">
+                <span class="icon">🤖</span>
+                <h1>AI Arbitrage Records</h1>
+            </div>
         </div>
 
         <!-- Filters -->
@@ -767,17 +841,85 @@
                             <td data-label="ROI %"><strong>${roiText}</strong></td>
                             <td data-label="Status"><span class="status-badge ${statusClass}">${record.status || 'pending'}</span></td>
                             <td data-label="Start Date"><div class="date-cell">${createdDate}</div></td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="btn-view">View</button>
-                                ${record.status === 'running' ? `<button class="btn-stop" onclick="updateStatus('${record.id}', 'stopped')">Stop</button>` : ''}
-                            </div>
-                        </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        ${record.status === 'running' ? `<button class="btn-stop" onclick="updateStatus('${record.id}', 'stopped')">Stop</button>` : ''}
+                                        <button class="btn-done" data-id="${record.id}">Done</button>
+                                        <button class="btn-delete" data-id="${record.id}">Delete</button>
+                                    </div>
+                                </td>
                     </tr>
                 `;
 
                 tbody.append(row);
-            });
+                });
+
+                // Bind Done / Delete buttons after rows appended
+                tbody.find('.btn-done').off('click').on('click', function() {
+                    const id = $(this).data('id');
+                    if (!confirm('Mark this arbitrage record as Done?')) return;
+                    const btn = $(this);
+                    btn.prop('disabled', true);
+                    // Update locally
+                    const idx = allRecords.findIndex(r => String(r.id) === String(id));
+                    if (idx !== -1) {
+                        allRecords[idx].status = 'completed';
+                    }
+                    btn.replaceWith('<span class="done-badge">Done</span>');
+                });
+
+                tbody.find('.btn-delete').off('click').on('click', function() {
+                    const id = $(this).data('id');
+                    if (!confirm('Are you sure you want to delete this arbitrage record?')) return;
+                    const btn = $(this);
+                    btn.prop('disabled', true).text('Deleting...');
+
+                    const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+                    const headers = {};
+                    if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+
+                    // Try DELETE
+                    $.ajax({
+                        url: '/api/admin/arbitrage/' + encodeURIComponent(id),
+                        method: 'DELETE',
+                        headers: headers,
+                        success: function(resp) {
+                            if (resp && resp.code === 1) {
+                                const idx = allRecords.findIndex(r => String(r.id) === String(id));
+                                if (idx !== -1) allRecords.splice(idx, 1);
+                                filteredRecords = [...allRecords];
+                                displayPage(currentPage);
+                            } else {
+                                alert('Delete failed: ' + (resp && resp.message ? resp.message : 'Unknown'));
+                                btn.prop('disabled', false).text('Delete');
+                            }
+                        },
+                        error: function() {
+                            // POST fallback
+                            $.ajax({
+                                url: '/api/admin/arbitrage/delete',
+                                method: 'POST',
+                                data: { id: id },
+                                headers: headers,
+                                success: function(resp2) {
+                                    if (resp2 && resp2.code === 1) {
+                                        const idx = allRecords.findIndex(r => String(r.id) === String(id));
+                                        if (idx !== -1) allRecords.splice(idx, 1);
+                                        filteredRecords = [...allRecords];
+                                        displayPage(currentPage);
+                                    } else {
+                                        alert('Delete failed: ' + (resp2 && resp2.message ? resp2.message : 'Unknown'));
+                                        btn.prop('disabled', false).text('Delete');
+                                    }
+                                },
+                                error: function() {
+                                    alert('Delete request failed. Please try again.');
+                                    btn.prop('disabled', false).text('Delete');
+                                }
+                            });
+                        }
+                    });
+                });
         }
 
         // Update record status

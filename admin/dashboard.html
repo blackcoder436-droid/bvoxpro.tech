@@ -11,6 +11,8 @@
             box-sizing: border-box;
         }
 
+        html, body { height: 100%; }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #0d1117;
@@ -21,66 +23,11 @@
             display: grid;
             grid-template-columns: 1fr;
             min-height: 100vh;
+            /* ensure content stays anchored to the top of the grid */
+            align-items: start;
+            align-content: start;
         }
 
-        /* Sidebar Navigation - Hidden */
-        /*
-        .sidebar {
-            display: none;
-        }
-
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 40px;
-            font-size: 18px;
-            font-weight: 700;
-            color: #58a6ff;
-        }
-
-        .sidebar-logo .icon {
-            font-size: 24px;
-        }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
-        .sidebar-title {
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: #8b949e;
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
-        }
-
-        .sidebar-menu {
-            list-style: none;
-        }
-
-        .sidebar-menu li {
-            margin-bottom: 8px;
-        }
-
-        .sidebar-menu a {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            color: #8b949e;
-            text-decoration: none;
-            border-radius: 6px;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-        
-        .sidebar-menu a:hover, .sidebar-menu a.active {
-            background: #30363d;
-            color: #58a6ff;
-        }
-        */
         .main-content {
             margin-left: 0;
             padding: 40px;
@@ -934,23 +881,7 @@
             .dashboard-container {
                 grid-template-columns: 1fr;
             }
-            /*
-            .sidebar {
-                position: fixed;
-                left: -250px;
-                top: 0;
-                width: 250px;
-                height: 100vh;
-                transition: left 0.3s ease;
-                z-index: 1000;
-                overflow-y: auto;
-                display: block;
-            }
 
-            .sidebar.open {
-                left: 0;
-            }
-            */
             .main-content {
                 margin-left: 0;
                 padding: 16px;
@@ -1074,22 +1005,7 @@
             .dashboard-container {
                 grid-template-columns: 1fr;
             }
-            /*
-            .sidebar {
-                position: fixed;
-                left: -250px;
-                top: 0;
-                width: 250px;
-                height: 100vh;
-                transition: left 0.3s ease;
-                z-index: 1000;
-                overflow-y: auto;
-                display: block;
-            }
-            .sidebar.open {
-                left: 0;
-            }
-            */
+          
             .main-content {
                 margin-left: 0;
                 padding: 24px;
@@ -1141,20 +1057,15 @@
 
         @media (min-width: 769px) and (max-width: 1024px) {
             /* iPad and small laptops */
+            /* Remove reserved sidebar column when sidebar is not present */
             .dashboard-container {
-                grid-template-columns: 200px 1fr;
+                grid-template-columns: 1fr;
             }
-            /*
-            .sidebar {
-                width: 200px;
-                padding: 20px 15px;
-                position: fixed;
-                display: block;
-            }
-            */
+
             .main-content {
-                margin-left: 200px;
+                margin: 0 auto;
                 padding: 32px;
+                max-width: 1200px;
             }
 
             .stats-grid {
@@ -1172,10 +1083,6 @@
             .dashboard-container {
                 grid-template-columns: 1fr;
             }
-            /*
-            .sidebar {
-                display: none;
-            }*/
 
             .main-content {
                 margin-left: 0;
@@ -1201,11 +1108,6 @@
 
         /* Landscape mode adjustments */
         @media (max-height: 500px) and (orientation: landscape) {
-            /*.sidebar {
-                overflow-y: auto;
-                height: 100vh;
-            }
-            */
             .stats-grid {
                 grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
                 gap: 12px;
@@ -1233,43 +1135,13 @@
         })();
     </script>
     <div class="dashboard-container">
-        <!-- Sidebar -->
-        <!--
-            <div class="sidebar">
-            
-            <div class="sidebar-logo">
-                <span class="icon">🔐</span>
-                <span>Bvox</span>
-            </div>
 
-            <div class="sidebar-section">
-                <div class="sidebar-title">Main Navigation</div>
-                <ul class="sidebar-menu">
-                    <li><a class="active">📊 Dashboard</a></li>
-                    <li><a href="#" id="userManagementLink">👥 Users Management</a></li>
-                </ul>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-title">Settings</div>
-                <ul class="sidebar-menu">
-                    <li><a href="#">👤 My Profile</a></li>
-                    <li>
-                        <div class="user-profile">
-                            <button class="logout-btn" onclick="logout()">Logout</button>
-                        </div>
-                    </li>
-                    
-                </ul>
-            </div>
-        </div>
-        -->
         <!-- Main Content -->
         <div class="main-content">
             <!-- Header -->
             <div class="header">
                 <div>
-                    <h1>Dashboard</h1>
+                    <h1>Admin Dashboard</h1>
                 </div>
                 <div class="header-actions">
                     <button class="header-btn user-list-btn" onclick="goToUserList()">
@@ -1283,10 +1155,6 @@
                     <button class="header-btn profile-btn" onclick="goToProfile()">
                         <span class="btn-icon">👤</span>
                         Profile
-                    </button>
-                    <button class="header-btn logout-btn" onclick="logout()">
-                        <span class="btn-icon">🚪</span>
-                        Logout
                     </button>
                 </div>
             </div>

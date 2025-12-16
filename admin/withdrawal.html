@@ -8,14 +8,33 @@
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:#1a1f2e;color:#e6edf3}
     .container{max-width:1400px;margin:0 auto;padding:40px 20px}
-    .header{background:linear-gradient(135deg,#667eea,#764ba2);padding:20px 30px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:12px}
+    .header{background:linear-gradient(135deg,#667eea,#764ba2);padding:20px 30px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:12px;position:relative}
+      .back-btn {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:36px;
+        height:36px;
+        border-radius:6px;
+        background:transparent;
+        border:1px solid #30363d;
+        color:#e6edf3;
+        text-decoration:none;
+        font-size:18px;
+        transition:all .2s;
+      }
+      .back-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: white;
+      }
     .header h1{font-size:24px;font-weight:700;color:#fff}
+    .header .title-wrapper{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;text-align:center}
     .filters{background:#252d3d;padding:20px 30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:15px;border:1px solid #404a5e;border-top:none;margin-bottom:20px}
     .filter-group{display:flex;flex-direction:column;gap:6px}
     .filter-group label{font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase}
     .filter-group input,.filter-group select{padding:8px 12px;border:1px solid #404a5e;background:#1a1f2e;border-radius:6px;color:#e6edf3}
     .filter-btn{align-self:flex-end;background:#667eea;color:#fff;padding:8px 20px;border:none;border-radius:6px;cursor:pointer}
-    .table-wrapper{background:#252d3d;border:1px solid #404a5e;border-radius:0 0 12px 12px;overflow:hidden}
+    .table-wrapper{background:#252d3d;border:1px solid #404a5e;border-radius:0 0 12px 12px;overflow:hidden;max-width:1100px;margin:24px auto}
     table{width:100%;border-collapse:collapse;background:#252d3d}
     thead{background:#1a1f2e}
     th{padding:16px 20px;text-align:left;font-weight:600;font-size:12px;color:#8b949e;border-bottom:1px solid #404a5e;text-transform:uppercase}
@@ -33,8 +52,8 @@
     .btn-approve,.btn-reject,.btn-view,.btn-delete{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;transition:all 0.3s}
     .btn-approve{background:#238636;color:#fff}
     .btn-approve:hover{background:#2ea043}
-    .btn-reject{background:#da3633;color:#fff}
-    .btn-reject:hover{background:#f85149}
+    .btn-reject{background:#ffb020;color:#111}
+    .btn-reject:hover{background:#ffc84a}
     .btn-view{background:#667eea;color:#fff}
     .btn-view:hover{background:#764ba2}
     .btn-delete{background:#da3633;color:#fff}
@@ -45,6 +64,7 @@
     .modal-close{position:absolute;top:10px;right:15px;font-size:28px;font-weight:bold;color:#e6edf3;cursor:pointer}
     .modal-close:hover{color:#667eea}
     .modal-image{max-width:100%;max-height:80vh;border-radius:8px}
+    .done-badge{display:inline-block;padding:6px 10px;border-radius:6px;background:rgba(76,175,80,0.15);color:#4caf50;font-weight:700;font-size:12px;text-transform:none}
     .no-data{text-align:center;padding:60px 20px;color:#8b949e}
     .pagination{display:flex;justify-content:center;gap:8px;margin-top:30px;align-items:center}
     .pagination button,.pagination span{padding:8px 14px;border:1px solid #404a5e;background:#252d3d;color:#e6edf3;border-radius:6px;cursor:pointer}
@@ -66,7 +86,13 @@
     })();
   </script>
   <div class="container">
-    <div class="header"><a href="/admin/dashboard.html" class="back-btn">← Dashboard</a><span class="icon">📤</span><h1>Withdrawals List</h1></div>
+    <div class="header">
+      <a href="/admin/dashboard.html" class="back-btn">←</a>
+      <div class="title-wrapper">
+        <span class="icon">📤</span>
+        <h1>Withdrawals List</h1>
+      </div>
+    </div>
 
     <div class="filters">
       <div class="filter-group"><label>Search ID</label><input id="filterUserId" placeholder="User ID..." /></div>
@@ -162,8 +188,18 @@
             <td data-label="DATE"><div class="date-cell">${createdDate}</div></td>
             <td data-label="ACTION">
               <div class="action-buttons">
-                ${record.status==='pending'?`<button class="btn-approve" onclick="updateStatus('${record.id}','complete')">Approve</button><button class="btn-reject" onclick="updateStatus('${record.id}','rejected')">Reject</button>`:`<button class="btn-view" onclick="showImage('${record.voucher_photo||''}')">View</button>`}
-                <button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>
+                ${(() => {
+                  const st = (record.status||'pending').toLowerCase();
+                  if (st === 'pending') {
+                    return `<button class="btn-approve" onclick="updateStatus('${record.id}','complete')">Approve</button><button class="btn-reject" onclick="updateStatus('${record.id}','rejected')">Reject</button>`;
+                  } else if (st === 'approved' || st === 'completed' || st === 'complete' || st === 'done') {
+                    return `<span class="done-badge">Done</span><button class="btn-delete" style="margin-left:8px" onclick="deleteRecord('${record.id}')">Delete</button>`;
+                  } else if (st === 'rejected') {
+                    return `<button class="btn-view" onclick="showImage('${record.voucher_photo||''}')">View</button><button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>`;
+                  } else {
+                    return `<button class="btn-view" onclick="showImage('${record.voucher_photo||''}')">View</button><button class="btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>`;
+                  }
+                })()}
               </div>
             </td>
           </tr>
@@ -194,73 +230,55 @@
     }
 
     function updateStatus(recordId,newStatus){
-      const record=allRecords.find(r=>r.id===recordId);
-      if(!record){alert('Record not found');return}
-      
-      // Map status values to user-friendly action words
-      const actionMap = {
-        'completed': 'Approve',
-        'complete': 'Approve',
-        'rejected': 'Reject'
-      };
-      const pastMap = {
-        'Approve': 'Approved',
-        'Reject': 'Rejected'
-      };
-      const actionText = actionMap[newStatus] || newStatus;
+      const record = allRecords.find(r=>r.id===recordId || r._id===recordId);
+      if(!record){ alert('Record not found'); return; }
 
-      // Show confirmation using user-friendly action
-      if(!confirm(`Are you sure you want to ${actionText} this withdrawal?`)){return}
-      
-      // Get the button element
-      const button=event.target;
-      const originalText=button.textContent;
-      button.disabled=true;
-      button.textContent='Processing...';
-      
-      // Determine API endpoint based on status
-      let apiUrl;
-      if(newStatus==='completed' || newStatus==='complete'){
-        apiUrl='/api/admin/withdrawal/approve-mongo';
-      }else if(newStatus==='rejected'){
-        apiUrl='/api/admin/withdrawal/reject-mongo';
-      }else{
-        button.disabled=false;
-        button.textContent=originalText;
-        return;
-      }
-      
+      const actionMap = { 'completed': 'Approve', 'complete': 'Approve', 'rejected': 'Reject' };
+      const actionText = actionMap[newStatus] || newStatus;
+      if(!confirm(`Are you sure you want to ${actionText} this withdrawal?`)) return;
+
+      // Optimistic UI update
+      const prevStatus = record.status;
+      const normalized = String(newStatus).toLowerCase();
+      if(normalized === 'completed' || normalized === 'complete') record.status = 'completed';
+      else if(normalized === 'rejected') record.status = 'rejected';
+
+      const idxAll = allRecords.findIndex(r=> r.id===recordId || r._id===recordId);
+      if(idxAll !== -1) allRecords[idxAll] = record;
+      filteredRecords = filteredRecords.map(r => (r.id===recordId || r._id===recordId) ? record : r);
+      displayPage(currentPage);
+
+      let apiUrl = null;
+      if(normalized === 'completed' || normalized === 'complete') apiUrl = '/api/admin/withdrawal/approve-mongo';
+      else if(normalized === 'rejected') apiUrl = '/api/admin/withdrawal/reject-mongo';
+      if(!apiUrl) return;
+
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      
-      // Call API to update MongoDB
       $.ajax({
-        url:apiUrl,
-        method:'PUT',
-        contentType:'application/json',
-        data:JSON.stringify({id:recordId}),
-        headers:{
-          'Authorization':`Bearer ${token}`
-        },
-        success:function(response){
-          if(response.success){
-            // Reload records from database
-            loadWithdrawalRecords();
-            const past = pastMap[actionText] || (actionText + 'ed');
-            alert(`Withdrawal ${past} successfully! User balance updated.`);
-            console.log(`✓ Successfully ${actionText} record ${recordId}`);
-            console.log('API Response:',response);
-          }else{
-            alert('Error: '+(response.error||response.message||'Operation failed'));
+        url: apiUrl,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ id: recordId }),
+        headers: { 'Authorization': `Bearer ${token}` },
+        success: function(response){
+          if(response && response.success){
+            console.log('Server confirmed status change for', recordId);
+          } else {
+            // revert
+            record.status = prevStatus;
+            if(idxAll !== -1) allRecords[idxAll] = record;
+            filteredRecords = filteredRecords.map(r => (r.id===recordId || r._id===recordId) ? record : r);
+            displayPage(currentPage);
+            alert('Server error: ' + ((response && (response.error || response.message)) || 'Operation failed'));
           }
         },
-        error:function(xhr,status,error){
-          console.error(`✗ Error updating record ${recordId}:`,error);
-          const errorMsg = xhr.responseJSON?.error || 'Could not connect to server';
-          alert('Error: ' + errorMsg);
-        },
-        complete:function(){
-          button.disabled=false;
-          button.textContent=originalText;
+        error: function(xhr,status,error){
+          console.error('Error updating withdrawal record:', error);
+          record.status = prevStatus;
+          if(idxAll !== -1) allRecords[idxAll] = record;
+          filteredRecords = filteredRecords.map(r => (r.id===recordId || r._id===recordId) ? record : r);
+          displayPage(currentPage);
+          alert('Network error: could not update record');
         }
       });
     }

@@ -534,6 +534,73 @@ async function getAdminById(adminId) {
     }
 }
 
+// Delete admin by ID
+async function deleteAdmin(adminId) {
+    try {
+        const mongoose = require('mongoose');
+        const orClauses = [ { id: adminId } ];
+        if (mongoose.Types.ObjectId.isValid(String(adminId))) {
+            orClauses.push({ _id: adminId });
+        }
+        const result = await Admin.findOneAndDelete({ $or: orClauses });
+        return result;
+    } catch (e) {
+        console.error('Error deleting admin:', e);
+        return null;
+    }
+}
+
+// Delete user by ID (userid, uid, or Mongo _id)
+async function deleteUser(userId) {
+    try {
+        const mongoose = require('mongoose');
+        const orClauses = [ { userid: userId }, { uid: userId }, { id: userId }, { user_id: userId } ];
+
+        // If userId looks numeric, also try numeric matches
+        const numericId = parseInt(userId, 10);
+        if (!isNaN(numericId)) {
+            orClauses.push({ userid: numericId });
+            orClauses.push({ uid: numericId });
+            orClauses.push({ id: numericId });
+            orClauses.push({ user_id: numericId });
+        }
+
+        // allow regex exact match as fallback for string variants
+        try {
+            orClauses.push({ userid: { $regex: `^${String(userId)}$`, $options: 'i' } });
+            orClauses.push({ uid: { $regex: `^${String(userId)}$`, $options: 'i' } });
+            orClauses.push({ id: { $regex: `^${String(userId)}$`, $options: 'i' } });
+            orClauses.push({ user_id: { $regex: `^${String(userId)}$`, $options: 'i' } });
+        } catch (e) {
+            // ignore regex errors
+        }
+
+        if (mongoose.Types.ObjectId.isValid(String(userId))) {
+            orClauses.push({ _id: userId });
+        }
+
+        // Try deleting directly using the built OR clauses
+        let result = await User.findOneAndDelete({ $or: orClauses });
+        if (result) return result;
+
+        // Final fallback: try to locate the user using getUserById (robust search), then delete by _id
+        try {
+            const existing = await getUserById(userId);
+            if (existing && existing._id) {
+                result = await User.findByIdAndDelete(existing._id);
+                return result;
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        return null;
+    } catch (e) {
+        console.error('Error deleting user:', e);
+        return null;
+    }
+}
+
 // Set arbitrary flags on a user record (e.g., force_trade_win)
 async function updateUserFlags(userId, flags) {
     try {
@@ -601,6 +668,8 @@ module.exports = {
     getAdminByUsername,
     getAllAdmins,
     getAdminById,
+    deleteAdmin,
+    deleteUser,
     updateUserFlags,
     // helper
     createUser
