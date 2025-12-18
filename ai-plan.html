@@ -249,27 +249,54 @@
                     }
                 }
 
-                // Create subscription via API (use same origin relative path)
+                // First check user's USDT balance via API
                 $.ajax({
-                    url: '/api/arbitrage/subscribe',
+                    url: '/api/wallet/getbalance',
                     type: 'POST',
                     dataType: 'json',
                     contentType: 'application/json',
-                    data: JSON.stringify({
-                        'user_id': userid || 'guest',
-                        'product_id': id,
-                        'amount': jine
-                    }),
-                    success: function(res) {
-                        if(res.success) {
-                            alert('Investment successful! Amount: $' + jine);
-                            location.href = "ai-record.html";
-                        } else {
-                            alert('Error: ' + res.message);
+                    data: JSON.stringify({ userid: userid }),
+                    success: function(balRes) {
+                        try {
+                            const usdt = (balRes && balRes.code===1 && balRes.data && Number(balRes.data.usdt)) ? Number(balRes.data.usdt) : 0;
+                            if (usdt < jine) {
+                                alert('Insufficient USDT balance. Your balance: ' + usdt.toFixed(2));
+                                return;
+                            }
+
+                            // Create subscription via API (use same origin relative path)
+                            $.ajax({
+                                url: '/api/arbitrage/subscribe',
+                                type: 'POST',
+                                dataType: 'json',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    'user_id': userid || 'guest',
+                                    'product_id': id,
+                                    'amount': jine
+                                }),
+                                success: function(res) {
+                                    if(res && res.success) {
+                                        alert('Investment successful! Amount: $' + jine);
+                                        location.href = "ai-record.html";
+                                    } else {
+                                        alert('Error: ' + (res && (res.message||res.error||res.data) || 'Unknown'));
+                                    }
+                                },
+                                error: function(xhr) {
+                                    let msg = 'Error creating subscription';
+                                    try { const body = xhr && xhr.responseJSON ? xhr.responseJSON : JSON.parse(xhr.responseText || '{}'); if(body && (body.message||body.error||body.data)) msg = body.message||body.error||body.data; } catch(e){}
+                                    alert(msg);
+                                }
+                            });
+                        } catch(e) {
+                            alert('Failed to check balance. Please try again.');
                         }
                     },
-                    error: function() {
-                        alert('Error creating subscription');
+                    error: function(xhr) {
+                        let msg = 'Failed to check balance';
+                        try { const body = xhr && xhr.responseJSON ? xhr.responseJSON : JSON.parse(xhr.responseText || '{}'); if(body && (body.message||body.error||body.data)) msg = body.message||body.error||body.data; } catch(e){}
+                        alert(msg);
                     }
                 });
             }

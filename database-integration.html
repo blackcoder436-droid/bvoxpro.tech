@@ -1,3 +1,59 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Database Integration - User Report</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px}
+    label,input,button{font-size:14px}
+    pre{background:#f7f7f7;border:1px solid #ddd;padding:12px;white-space:pre-wrap}
+    .summary{margin-top:8px;padding:8px;background:#eef}
+  </style>
+</head>
+<body>
+  <h2>Database Integration — User Report</h2>
+  <p>Enter a user id and click <strong>Load Report</strong>. The page calls <code>/api/debug/user-report/:userId</code>.</p>
+  <div>
+    <label>User ID: <input id="userid" value="1000004" /></label>
+    <button id="load">Load Report</button>
+  </div>
+
+  <div class="summary" id="summary" style="display:none"></div>
+  <h3>Full Report</h3>
+  <pre id="out">Click Load Report to fetch data...</pre>
+
+  <script>
+    async function fetchReport(uid) {
+      const out = document.getElementById('out');
+      const sumEl = document.getElementById('summary');
+      out.textContent = 'Loading...'; sumEl.style.display='none';
+      try {
+        const resp = await fetch('/api/debug/user-report/' + encodeURIComponent(uid));
+        const json = await resp.json();
+        if (!json || !json.success) {
+          out.textContent = 'Error: ' + (json && json.error ? json.error : 'Unexpected response');
+          return;
+        }
+        out.textContent = JSON.stringify(json.data, null, 2);
+        const s = json.data.summary || {};
+        sumEl.style.display='block';
+        sumEl.innerHTML = `<strong>Pending total:</strong> ${s.pending_total || 0} &nbsp; <strong>Credited total:</strong> ${s.credited_total || 0}`;
+      } catch (e) {
+        out.textContent = 'Fetch failed: ' + e.message;
+      }
+    }
+
+    document.getElementById('load').addEventListener('click', ()=>{
+      const uid = document.getElementById('userid').value.trim();
+      if (!uid) return alert('Enter user id');
+      fetchReport(uid);
+    });
+
+    // auto-load default
+    window.addEventListener('load', ()=> fetchReport(document.getElementById('userid').value));
+  </script>
+</body>
+</html>
 <!DOCTYPE html>
 <html lang="en">
 <head>

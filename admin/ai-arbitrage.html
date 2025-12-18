@@ -682,12 +682,13 @@
                         <th>ROI %</th>
                         <th>STATUS</th>
                         <th>START DATE</th>
+                        <th>END DATE</th>
                         <th>ACTION</th>
                     </tr>
                 </thead>
                 <tbody id="arbitrageBody">
                     <tr>
-                        <td colspan="9">
+                        <td colspan="10">
                             <div class="no-data">
                                 <div class="no-data-icon">📁</div>
                                 <div>Loading arbitrage records...</div>
@@ -743,16 +744,30 @@
                 success: function(response) {
                     // Map subscription structure to table-friendly record structure
                     if (response && response.data && Array.isArray(response.data)) {
-                        allRecords = response.data.map(s => ({
-                            id: s.id || '',
-                            user_id: s.user_id || '',
-                            pair: s.product_name || s.product_id || 'N/A',
-                            initial_amount: s.amount || 0,
-                            profit: s.total_income || 0,
-                            roi: s.roi || (s.amount ? ((s.total_income || 0) / s.amount * 100) : 0),
-                            status: s.status || 'unknown',
-                            created_at: s.created_at || s.start_date || new Date().toISOString()
-                        }));
+                        allRecords = response.data.map(s => {
+                            const start = s.start_date || s.created_at || new Date().toISOString();
+                            const durationDays = (s.product && s.product.duration_days) || s.duration_days || s.duration || 0;
+                            let end = s.end_date || null;
+                            if (!end && start && durationDays) {
+                                try {
+                                    end = new Date(new Date(start).getTime() + Number(durationDays) * 24 * 3600 * 1000).toISOString();
+                                } catch (e) {
+                                    end = null;
+                                }
+                            }
+                            return {
+                                id: s.id || '',
+                                user_id: s.user_id || s.userId || '',
+                                pair: s.product_name || s.product_id || (s.product && s.product.name) || 'N/A',
+                                initial_amount: s.amount || 0,
+                                profit: s.total_income || 0,
+                                roi: s.roi || (s.amount ? ((s.total_income || 0) / s.amount * 100) : 0),
+                                status: s.status || 'unknown',
+                                created_at: start,
+                                duration_days: Number(durationDays) || 0,
+                                end_date: end
+                            };
+                        });
                     } else {
                         console.log('No records found or invalid response format');
                         allRecords = [];
@@ -804,7 +819,7 @@
             if (records.length === 0) {
                 tbody.html(`
                     <tr>
-                        <td colspan="9">
+                        <td colspan="10">
                             <div class="no-data">
                                 <div class="no-data-icon">📁</div>
                                 <div>No arbitrage records found.</div>
@@ -831,6 +846,9 @@
                 const roiVal = Number(record.roi) || 0;
                 const roiText = (roiVal >= 0 ? '+' : '') + roiVal.toFixed(3) + '%';
 
+                const endDateDisplay = record.end_date ? new Date(record.end_date).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric'
+                }) : '-';
                 const row = `
                     <tr>
                             <td data-label="ID"><div class="id-cell">${record.display_id || record.id}</div></td>
@@ -841,10 +859,10 @@
                             <td data-label="ROI %"><strong>${roiText}</strong></td>
                             <td data-label="Status"><span class="status-badge ${statusClass}">${record.status || 'pending'}</span></td>
                             <td data-label="Start Date"><div class="date-cell">${createdDate}</div></td>
+                            <td data-label="End Date"><div class="date-cell">${endDateDisplay}</div></td>
                                 <td>
                                     <div class="action-buttons">
                                         ${record.status === 'running' ? `<button class="btn-stop" onclick="updateStatus('${record.id}', 'stopped')">Stop</button>` : ''}
-                                        <button class="btn-done" data-id="${record.id}">Done</button>
                                         <button class="btn-delete" data-id="${record.id}">Delete</button>
                                     </div>
                                 </td>
@@ -854,19 +872,7 @@
                 tbody.append(row);
                 });
 
-                // Bind Done / Delete buttons after rows appended
-                tbody.find('.btn-done').off('click').on('click', function() {
-                    const id = $(this).data('id');
-                    if (!confirm('Mark this arbitrage record as Done?')) return;
-                    const btn = $(this);
-                    btn.prop('disabled', true);
-                    // Update locally
-                    const idx = allRecords.findIndex(r => String(r.id) === String(id));
-                    if (idx !== -1) {
-                        allRecords[idx].status = 'completed';
-                    }
-                    btn.replaceWith('<span class="done-badge">Done</span>');
-                });
+                // Bind Delete button after rows appended
 
                 tbody.find('.btn-delete').off('click').on('click', function() {
                     const id = $(this).data('id');

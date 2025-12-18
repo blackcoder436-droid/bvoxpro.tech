@@ -753,10 +753,82 @@ router.delete('/api/admin/arbitrage/:id', async (req, res) => {
 
         let deleted = null;
         if (mongoose.Types.ObjectId.isValid(id)) {
+            // find first so we can refund before delete
+            const sub = await ArbitrageSubscription.findById(id).lean();
+            if (sub) {
+                // refund when subscription is active (or explicitly withheld)
+                try {
+                    const refundAmount = Number(sub.withheld_amount || sub.amount || 0);
+                    if (refundAmount > 0 && sub.status && sub.status !== 'completed') {
+                        const User = require('../models/User');
+                        const Topup = require('../models/Topup');
+                        const userQuery = { $or: [{ userid: sub.user_id }, { id: sub.user_id }, { uid: sub.user_id }] };
+                        const userDoc = await User.findOne(userQuery).exec();
+                        if (userDoc) {
+                            try {
+                                let updatedUser = null;
+                                // If user uses balances.usdt, prefer that; otherwise fallback to legacy `balance`.
+                                if (userDoc.balances && typeof userDoc.balances.usdt !== 'undefined') {
+                                    updatedUser = await User.findOneAndUpdate(userQuery, { $inc: { 'balances.usdt': refundAmount } }, { new: true }).exec();
+                                } else if (typeof userDoc.balance !== 'undefined') {
+                                    updatedUser = await User.findOneAndUpdate(userQuery, { $inc: { balance: refundAmount } }, { new: true }).exec();
+                                } else {
+                                    // No balance fields present; set balances.usdt
+                                    updatedUser = await User.findOneAndUpdate(userQuery, { $set: { balances: Object.assign({}, userDoc.balances || {}, { usdt: refundAmount }) } }, { new: true }).exec();
+                                }
+
+                                try { await Topup.create({ id: `topup_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, user_id: sub.user_id, coin: 'USDT', amount: refundAmount, status: 'complete', timestamp: Date.now(), created_at: new Date() }); } catch (e) { console.warn('[admin/arbitrage/delete] failed to write topup', e && e.message); }
+                                console.log(`[admin/arbitrage/delete] refunded ${refundAmount} USDT to user ${sub.user_id} due to admin delete`);
+                            } catch (e) {
+                                console.error('[admin/arbitrage/delete] refund update error:', e && e.message);
+                            }
+                        } else {
+                            console.warn('[admin/arbitrage/delete] user not found for refund', sub.user_id);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[admin/arbitrage/delete] refund error:', e && e.message);
+                }
+            }
+
             deleted = await ArbitrageSubscription.findByIdAndDelete(id);
         }
 
         if (!deleted) {
+            // try by custom id field
+            const sub2 = await ArbitrageSubscription.findOne({ id: id }).lean();
+            if (sub2) {
+                try {
+                    const refundAmount = Number(sub2.withheld_amount || sub2.amount || 0);
+                    if (refundAmount > 0 && sub2.status && sub2.status !== 'completed') {
+                        const User = require('../models/User');
+                        const Topup = require('../models/Topup');
+                        const userQuery = { $or: [{ userid: sub2.user_id }, { id: sub2.user_id }, { uid: sub2.user_id }] };
+                        const userDoc = await User.findOne(userQuery).exec();
+                        if (userDoc) {
+                            try {
+                                let updatedUser = null;
+                                if (userDoc.balances && typeof userDoc.balances.usdt !== 'undefined') {
+                                    updatedUser = await User.findOneAndUpdate(userQuery, { $inc: { 'balances.usdt': refundAmount } }, { new: true }).exec();
+                                } else if (typeof userDoc.balance !== 'undefined') {
+                                    updatedUser = await User.findOneAndUpdate(userQuery, { $inc: { balance: refundAmount } }, { new: true }).exec();
+                                } else {
+                                    updatedUser = await User.findOneAndUpdate(userQuery, { $set: { balances: Object.assign({}, userDoc.balances || {}, { usdt: refundAmount }) } }, { new: true }).exec();
+                                }
+                                try { await Topup.create({ id: `topup_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, user_id: sub2.user_id, coin: 'USDT', amount: refundAmount, status: 'complete', timestamp: Date.now(), created_at: new Date() }); } catch (e) { console.warn('[admin/arbitrage/delete] failed to write topup', e && e.message); }
+                                console.log(`[admin/arbitrage/delete] refunded ${refundAmount} USDT to user ${sub2.user_id} due to admin delete`);
+                            } catch (e) {
+                                console.error('[admin/arbitrage/delete] refund update error:', e && e.message);
+                            }
+                        } else {
+                            console.warn('[admin/arbitrage/delete] user not found for refund', sub2.user_id);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[admin/arbitrage/delete] refund error:', e && e.message);
+                }
+            }
+
             const result = await ArbitrageSubscription.deleteOne({ id: id });
             if (result && result.deletedCount && result.deletedCount > 0) {
                 return res.json({ code: 1, message: 'Deleted' });
@@ -783,10 +855,53 @@ router.post('/api/admin/arbitrage/delete', async (req, res) => {
 
         let deleted = null;
         if (id && mongoose.Types.ObjectId.isValid(id)) {
+            // find first so we can refund before delete
+            const sub = await ArbitrageSubscription.findById(id).lean();
+            if (sub) {
+                try {
+                    const refundAmount = Number(sub.withheld_amount || sub.amount || 0);
+                    if (refundAmount > 0 && sub.status && sub.status !== 'completed') {
+                        const User = require('../models/User');
+                        const Topup = require('../models/Topup');
+                        const userQuery = { $or: [{ userid: sub.user_id }, { id: sub.user_id }, { uid: sub.user_id }] };
+                        const updatedUser = await User.findOneAndUpdate(userQuery, { $inc: { 'balances.usdt': refundAmount } }, { new: true }).exec();
+                        if (updatedUser) {
+                            try { await Topup.create({ id: `topup_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, user_id: sub.user_id, coin: 'USDT', amount: refundAmount, status: 'complete', timestamp: Date.now(), created_at: new Date() }); } catch (e) { console.warn('[admin/arbitrage/delete] failed to write topup', e && e.message); }
+                            console.log(`[admin/arbitrage/delete] refunded ${refundAmount} USDT to user ${sub.user_id} due to admin delete`);
+                        } else {
+                            console.warn('[admin/arbitrage/delete] user not found for refund', sub.user_id);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[admin/arbitrage/delete] refund error:', e && e.message);
+                }
+            }
+
             deleted = await ArbitrageSubscription.findByIdAndDelete(id);
         }
 
         if (!deleted) {
+            const sub2 = await ArbitrageSubscription.findOne({ id: id }).lean();
+            if (sub2) {
+                try {
+                    const refundAmount = Number(sub2.withheld_amount || sub2.amount || 0);
+                    if (refundAmount > 0 && sub2.status && sub2.status !== 'completed') {
+                        const User = require('../models/User');
+                        const Topup = require('../models/Topup');
+                        const userQuery = { $or: [{ userid: sub2.user_id }, { id: sub2.user_id }, { uid: sub2.user_id }] };
+                        const updatedUser = await User.findOneAndUpdate(userQuery, { $inc: { 'balances.usdt': refundAmount } }, { new: true }).exec();
+                        if (updatedUser) {
+                            try { await Topup.create({ id: `topup_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, user_id: sub2.user_id, coin: 'USDT', amount: refundAmount, status: 'complete', timestamp: Date.now(), created_at: new Date() }); } catch (e) { console.warn('[admin/arbitrage/delete] failed to write topup', e && e.message); }
+                            console.log(`[admin/arbitrage/delete] refunded ${refundAmount} USDT to user ${sub2.user_id} due to admin delete`);
+                        } else {
+                            console.warn('[admin/arbitrage/delete] user not found for refund', sub2.user_id);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[admin/arbitrage/delete] refund error:', e && e.message);
+                }
+            }
+
             const result = await ArbitrageSubscription.deleteOne({ id: id });
             if (result && result.deletedCount && result.deletedCount > 0) {
                 return res.json({ code: 1, message: 'Deleted' });
@@ -1755,6 +1870,117 @@ router.post('/api/admin/mine/redeem/reject', async (req, res) => {
     }
 });
 
+// POST /api/admin/mining/apply/:id - apply a single day's reward to the user's balance (admin only)
+router.post('/api/admin/mining/apply/:id', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ code: 0, message: 'Unauthorized' });
+
+        const id = req.params.id;
+        if (!id) return res.status(400).json({ code: 0, message: 'Missing id' });
+
+        const mongoose = require('mongoose');
+        const Mining = require('../models/Mining');
+        const User = require('../models/User');
+
+        // Flexible find
+        const query = { $or: [{ id: id }] };
+        if (mongoose.Types.ObjectId.isValid(id)) query.$or.push({ _id: id });
+
+        const mining = await Mining.findOne(query);
+        if (!mining) return res.status(404).json({ code: 0, message: 'Mining record not found' });
+
+        // Determine if already claimed within last 24 hours
+        const now = new Date();
+        if (mining.last_claim) {
+            const diffMs = now - new Date(mining.last_claim);
+            if (diffMs < 24 * 60 * 60 * 1000) {
+                return res.json({ code: 0, message: 'Already claimed in last 24 hours' });
+            }
+        }
+
+        const staked = Number(mining.amount || mining.stakedAmount || 0);
+        const dailyRate = Number(mining.daily_reward || mining.dailyYield || 0);
+        if (!staked || !dailyRate) return res.status(400).json({ code: 0, message: 'Missing amount or daily reward rate' });
+
+        const dailyReward = Number((staked * dailyRate));
+
+        // Credit user's ETH balance by default
+        const userId = mining.user_id || mining.userid || mining.user || mining.userId;
+        if (!userId) return res.status(400).json({ code: 0, message: 'Mining record missing user id' });
+
+        // Find and update user
+        const user = await User.findOneAndUpdate(
+            { $or: [{ userid: userId }, { uid: userId }, { id: userId }] },
+            { $inc: { ['balances.eth']: dailyReward }, $set: { updated_at: new Date() } },
+            { new: true }
+        );
+
+        if (!user) return res.status(404).json({ code: 0, message: 'User not found to credit balance' });
+
+        // Update mining record
+        mining.total_earned = (Number(mining.total_earned || mining.totalIncome || 0) + dailyReward);
+        mining.last_claim = now;
+        mining.updated_at = now;
+        await mining.save();
+
+        return res.json({ code: 1, message: 'Reward applied', data: { userId, dailyReward } });
+    } catch (e) {
+        console.error('[admin/mining/apply] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
+// POST /api/admin/mining/settle-due - settle daily rewards for all mining records due (admin only)
+router.post('/api/admin/mining/settle-due', async (req, res) => {
+    try {
+        const admin = await verifyAdminToken(req);
+        if (!admin) return res.status(401).json({ code: 0, message: 'Unauthorized' });
+
+        const Mining = require('../models/Mining');
+        const User = require('../models/User');
+
+        const now = new Date();
+        const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        // Find active mining records which have not been claimed in the last 24 hours
+        const dueRecords = await Mining.find({ status: 'active', $or: [ { last_claim: { $exists: false } }, { last_claim: { $lte: cutoff } }, { last_claim: null } ] }).lean();
+
+        let processed = 0;
+        for (const m of dueRecords) {
+            try {
+                const staked = Number(m.amount || m.stakedAmount || 0);
+                const dailyRate = Number(m.daily_reward || m.dailyYield || 0);
+                if (!staked || !dailyRate) continue;
+                const reward = Number(staked * dailyRate);
+                const userId = m.user_id || m.userid || m.user || m.userId;
+                if (!userId) continue;
+
+                // Credit user
+                const user = await User.findOneAndUpdate(
+                    { $or: [{ userid: userId }, { uid: userId }, { id: userId }] },
+                    { $inc: { ['balances.eth']: reward }, $set: { updated_at: new Date() } },
+                    { new: true }
+                );
+                if (!user) continue;
+
+                // Update mining record last_claim and total_earned
+                await Mining.updateOne({ _id: m._id }, { $inc: { total_earned: reward }, $set: { last_claim: new Date(), updated_at: new Date() } });
+
+                processed++;
+            } catch (innerE) {
+                console.warn('[admin/mining/settle-due] failed for record', m._id, innerE && innerE.message);
+                continue;
+            }
+        }
+
+        return res.json({ code: 1, message: 'Settle complete', processed, totalDue: dueRecords.length });
+    } catch (e) {
+        console.error('[admin/mining/settle-due] error:', e && e.message);
+        return res.status(500).json({ code: 0, message: e.message });
+    }
+});
+
 // DELETE /api/admin/mining/:id - delete a single mining record
 router.delete('/api/admin/mining/:id', async (req, res) => {
     try {
@@ -2521,13 +2747,35 @@ router.post('/api/arbitrage/subscribe', async (req, res) => {
             });
         }
         
-        // Calculate profit based on average daily return
+        // Calculate profit based on product's daily return range and invested amount.
         const dailyReturnMin = parseFloat(product.daily_return_min) || 0;
         const dailyReturnMax = parseFloat(product.daily_return_max) || 0;
-        const avgDailyReturn = (dailyReturnMin + dailyReturnMax) / 2;
         const durationDays = parseInt(product.duration_days) || 1;
-        const totalReturnPercent = avgDailyReturn * durationDays;
-        const totalIncome = (investAmount * totalReturnPercent) / 100;
+
+        // Determine actual daily return for this subscription by interpolating between min/max
+        let dailyReturn = dailyReturnMin;
+        try {
+            const minAmt = Number(product.min_amount) || 0;
+            const maxAmt = Number(product.max_amount) || minAmt;
+            if (investAmount <= minAmt) {
+                dailyReturn = dailyReturnMin;
+            } else if (investAmount >= maxAmt) {
+                dailyReturn = dailyReturnMax;
+            } else {
+                const ratio = (investAmount - minAmt) / (maxAmt - minAmt);
+                dailyReturn = dailyReturnMin + ratio * (dailyReturnMax - dailyReturnMin);
+            }
+        } catch (e) {
+            dailyReturn = (dailyReturnMin + dailyReturnMax) / 2;
+        }
+
+        // Keep precision reasonable
+        dailyReturn = Number(dailyReturn.toFixed(4));
+
+        // Store 'total_return_percent' as the daily percent (per plan spec).
+        const totalReturnPercent = Number(dailyReturn.toFixed(4));
+        // total income = amount * (dailyReturn%) * durationDays
+        const totalIncome = Number(((investAmount * (dailyReturn/100) * durationDays)).toFixed(4));
         
         // Create subscription record
         const ArbitrageSubscription = require('../models/ArbitrageSubscription');
@@ -2539,6 +2787,7 @@ router.post('/api/arbitrage/subscribe', async (req, res) => {
             amount: investAmount,
             earned: 0,
             days_completed: 0,
+            daily_return: dailyReturn,
             daily_return_min: dailyReturnMin,
             daily_return_max: dailyReturnMax,
             total_return_percent: totalReturnPercent,
@@ -2554,23 +2803,56 @@ router.post('/api/arbitrage/subscribe', async (req, res) => {
         const savedSubscription = await subscription.save();
         console.log(`[arbitrage-subscribe] ✓ Created subscription ${savedSubscription.id} for user ${user_id}, amount: ${investAmount}`);
         
-        // Deduct USDT from user balance - find user by any of the ID fields
-        const userDoc = await User.findOne({ $or: [
-            { id: user_id },
-            { userid: user_id },
-            { uid: user_id }
-        ] });
-        
-        if (userDoc) {
-            const newUsdt = Math.round((currentUsdt - investAmount) * 100) / 100;
-            userDoc.balances = userDoc.balances || {};
-            userDoc.balances.usdt = newUsdt;
-            await userDoc.save();
-            console.log(`[arbitrage-subscribe] ✓ Deducted ${investAmount} USDT from user ${user_id}. New balance: ${newUsdt}`);
-        } else {
-            console.error(`[arbitrage-subscribe] ⚠ Could not find user ${user_id} to deduct balance`);
+        // Atomically deduct USDT (prefer balances.usdt, fallback to balance)
+        let deducted = false;
+        try {
+            // Try to deduct from balances.usdt atomically
+            const queryUsd = { $or: [ { id: user_id }, { userid: user_id }, { uid: user_id } ], 'balances.usdt': { $gte: investAmount } };
+            let updatedUser = await User.findOneAndUpdate(queryUsd, { $inc: { 'balances.usdt': -investAmount } }, { new: true }).exec();
+            if (updatedUser) {
+                deducted = true;
+                console.log(`[arbitrage-subscribe] ✓ Atomically deducted ${investAmount} USDT from user ${user_id}. New balance: ${updatedUser.balances.usdt}`);
+            } else {
+                // Fallback: try legacy `balance` field
+                const queryBal = { $or: [ { id: user_id }, { userid: user_id }, { uid: user_id } ], balance: { $gte: investAmount } };
+                updatedUser = await User.findOneAndUpdate(queryBal, { $inc: { balance: -investAmount } }, { new: true }).exec();
+                if (updatedUser) {
+                    deducted = true;
+                    console.log(`[arbitrage-subscribe] ✓ Atomically deducted ${investAmount} from legacy balance for user ${user_id}. New balance: ${updatedUser.balance}`);
+                }
+            }
+        } catch (e) {
+            console.error('[arbitrage-subscribe] Error during atomic deduction:', e && e.message);
         }
-        
+
+        if (!deducted) {
+            // As a last resort, attempt to find user and set negative balance (will still record subscription but warn)
+            try {
+                const userDoc2 = await User.findOne({ $or: [ { id: user_id }, { userid: user_id }, { uid: user_id } ] });
+                if (userDoc2) {
+                    userDoc2.balances = userDoc2.balances || {};
+                    const prev = Number(userDoc2.balances.usdt || userDoc2.balance || 0);
+                    userDoc2.balances.usdt = Math.round((prev - investAmount) * 100) / 100;
+                    await userDoc2.save();
+                    deducted = true;
+                    console.warn(`[arbitrage-subscribe] ⚠ Deducted by fallback (non-atomic) ${investAmount} for user ${user_id}. New balance: ${userDoc2.balances.usdt}`);
+                } else {
+                    console.error(`[arbitrage-subscribe] ⚠ Could not find user ${user_id} to deduct balance`);
+                }
+            } catch (e) {
+                console.error('[arbitrage-subscribe] Fallback deduction failed:', e && e.message);
+            }
+        }
+
+        // Mark subscription as withholding principal so settlement credits only at end_date
+        try {
+            savedSubscription.withheld = true;
+            savedSubscription.withheld_amount = investAmount;
+            await savedSubscription.save();
+        } catch (e) {
+            console.warn('[arbitrage-subscribe] Failed to mark subscription as withheld:', e && e.message);
+        }
+
         // Log as topup record (negative amount for audit trail)
         try {
             const Topup = require('../models/Topup');
@@ -2627,25 +2909,75 @@ router.get('/api/arbitrage/subscriptions', async (req, res) => {
             return res.json({ success: true, subscriptions: [] });
         }
         
-        res.json({ 
-            success: true, 
-            subscriptions: subscriptions.map(sub => ({
-                id: sub._id,
-                user_id: sub.user_id,
-                product_id: sub.product_id,
-                product_name: sub.product_name,
-                amount: sub.amount,
-                earned: sub.earned || 0,
-                days_completed: sub.days_completed || 0,
-                total_income: sub.total_income || 0,
-                total_return_percent: sub.total_return_percent || 0,
-                status: sub.status,
-                start_date: sub.start_date,
-                end_date: sub.end_date,
-                created_at: sub.created_at,
-                updated_at: sub.updated_at
-            }))
-        });
+        const ArbitrageProduct = require('../models/ArbitrageProduct');
+
+        // helper seed products (fallback)
+        const seedProducts = {
+            '1': { id: '1', name: 'Smart Plan A', min_amount: 500, max_amount: 5000, duration_days: 1, daily_return_min: 1.60, daily_return_max: 1.80 },
+            '2': { id: '2', name: 'Smart Plan B', min_amount: 5001, max_amount: 30000, duration_days: 3, daily_return_min: 1.90, daily_return_max: 2.60 },
+            '3': { id: '3', name: 'Smart Plan C', min_amount: 30001, max_amount: 100000, duration_days: 7, daily_return_min: 2.80, daily_return_max: 3.20 },
+            '4': { id: '4', name: 'Smart Plan D', min_amount: 100001, max_amount: 500000, duration_days: 15, daily_return_min: 3.50, daily_return_max: 5.30 },
+            '5': { id: '5', name: 'Smart Plan VIP', min_amount: 500001, max_amount: 1000000, duration_days: 30, daily_return_min: 5.80, daily_return_max: 6.30 }
+        };
+
+        const out = [];
+        for (const sub of subscriptions) {
+            try {
+                // obtain product info from DB or seed
+                let product = null;
+                try { product = await ArbitrageProduct.findOne({ $or: [{ id: sub.product_id }, { _id: sub.product_id }] }).lean().catch(()=>null); } catch(e) { product = null; }
+                if (!product) product = seedProducts[String(sub.product_id)];
+
+                const amount = Number(sub.amount || 0);
+                const dailyMin = product ? Number(product.daily_return_min || 0) : Number(sub.daily_return_min || 0);
+                const dailyMax = product ? Number(product.daily_return_max || 0) : Number(sub.daily_return_max || 0);
+                const minAmt = product ? Number(product.min_amount || 0) : 0;
+                const maxAmt = product ? Number(product.max_amount || minAmt) : minAmt;
+
+                let dailyReturn = (typeof sub.daily_return === 'number' && sub.daily_return > 0) ? sub.daily_return : ((dailyMin + dailyMax) / 2);
+                if (amount <= minAmt) dailyReturn = dailyMin;
+                else if (amount >= maxAmt) dailyReturn = dailyMax;
+                else if (maxAmt > minAmt) {
+                    const ratio = (amount - minAmt) / (maxAmt - minAmt);
+                    dailyReturn = dailyMin + ratio * (dailyMax - dailyMin);
+                }
+                dailyReturn = Number(dailyReturn.toFixed(4));
+
+                const durationDays = sub.end_date && sub.start_date ? Math.max(1, Math.round((new Date(sub.end_date) - new Date(sub.start_date)) / (24*60*60*1000))) : (product ? (product.duration_days||1) : (sub.duration_days||1));
+                // Expose/store daily percent as `total_return_percent` (per user's expectation)
+                const totalReturnPercent = Number(dailyReturn.toFixed(4));
+                const totalIncome = Number(((amount * (dailyReturn/100) * durationDays)).toFixed(4));
+
+                out.push({
+                    id: sub._id,
+                    user_id: sub.user_id,
+                    product_id: sub.product_id,
+                    product_name: sub.product_name,
+                    amount: sub.amount,
+                    earned: sub.earned || 0,
+                    days_completed: sub.days_completed || 0,
+                    total_income: totalIncome,
+                    total_return_percent: totalReturnPercent,
+                    status: sub.status,
+                    start_date: sub.start_date,
+                    end_date: sub.end_date,
+                    created_at: sub.created_at,
+                    updated_at: sub.updated_at
+                });
+
+                // If DB values differ significantly, update the subscription document to keep DB consistent
+                const needUpdate = Math.abs((sub.total_return_percent||0) - totalReturnPercent) > 0.0001 || Math.abs((sub.total_income||0) - totalIncome) > 0.0001 || (typeof sub.daily_return !== 'number' || Math.abs((sub.daily_return||0) - dailyReturn) > 0.0001);
+                if (needUpdate) {
+                    try {
+                        await ArbitrageSubscription.updateOne({ _id: sub._id }, { $set: { daily_return: dailyReturn, total_return_percent: totalReturnPercent, total_income: totalIncome, updated_at: new Date() } }).catch(()=>null);
+                    } catch(e) { /* ignore update errors */ }
+                }
+            } catch (e) {
+                console.error('[arbitrage/subscriptions] error processing sub', sub._id, e && e.message);
+            }
+        }
+
+        res.json({ success: true, subscriptions: out });
     } catch (e) {
         console.error('[arbitrage/subscriptions] Error:', e.message);
         res.status(500).json({ success: false, message: e.message });
@@ -3290,6 +3622,71 @@ async function proxyPostExternal(externalUrl, req, res) {
         res.status(500).json({ code: 0, data: e.message });
     }
 }
+
+// POST /api/arbitrage/settle-due - complete subscriptions whose end_date has passed and credit users
+router.post('/api/arbitrage/settle-due', async (req, res) => {
+    try {
+        // Allow either admin token or internal call (if server calls endpoint, it should include admin token)
+        const admin = await verifyAdminToken(req).catch(()=>null);
+
+        const now = new Date();
+        const ArbitrageSubscription = require('../models/ArbitrageSubscription');
+        const User = require('../models/User');
+
+        const dueSubs = await ArbitrageSubscription.find({ status: 'active', end_date: { $lte: now } });
+        if (!dueSubs || dueSubs.length === 0) return res.json({ success: true, processed: 0, message: 'No due subscriptions' });
+
+        let processed = 0;
+        for (const sub of dueSubs) {
+            try {
+                // Recompute totals defensively
+                const amount = Number(sub.amount || 0);
+                const durationDays = sub.end_date && sub.start_date ? Math.max(1, Math.round((new Date(sub.end_date) - new Date(sub.start_date)) / (24*60*60*1000))) : (sub.duration_days || 1);
+                const dailyReturn = typeof sub.daily_return === 'number' && sub.daily_return > 0 ? sub.daily_return : ((Number(sub.daily_return_min||0) + Number(sub.daily_return_max||0))/2);
+                const totalReturnPercent = Number((dailyReturn * durationDays).toFixed(4));
+                const totalIncome = Number(((amount * totalReturnPercent) / 100).toFixed(4));
+
+                // Credit user: return principal + total income to USDT balance
+                const userQuery = { $or: [{ userid: sub.user_id }, { id: sub.user_id }, { uid: sub.user_id }] };
+                const userDoc = await User.findOne(userQuery);
+                if (!userDoc) {
+                    console.warn('[arbitrage/settle-due] user not found for subscription', sub._id);
+                    continue;
+                }
+
+                userDoc.balances = userDoc.balances || {};
+                const currentUsdt = Number(userDoc.balances.usdt || 0);
+                const credit = Number((amount + totalIncome).toFixed(4));
+                userDoc.balances.usdt = Math.round((currentUsdt + credit) * 100) / 100;
+                await userDoc.save();
+
+                // Update subscription
+                sub.status = 'completed';
+                sub.earned = totalIncome;
+                sub.days_completed = durationDays;
+                sub.total_income = totalIncome;
+                sub.total_return_percent = totalReturnPercent;
+                sub.updated_at = new Date();
+                await sub.save();
+
+                // Ledger entry
+                try {
+                    const Topup = require('../models/Topup');
+                    await Topup.create({ id: `topup_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, user_id: sub.user_id, coin: 'USDT', amount: credit, status: 'complete', timestamp: Date.now(), created_at: new Date() });
+                } catch (e) { console.warn('[arbitrage/settle-due] failed to write topup', e && e.message); }
+
+                processed++;
+            } catch (innerE) {
+                console.error('[arbitrage/settle-due] error processing sub', sub._id, innerE && innerE.message);
+            }
+        }
+
+        return res.json({ success: true, processed: processed });
+    } catch (e) {
+        console.error('[arbitrage/settle-due] error:', e && e.message);
+        return res.status(500).json({ success: false, message: e.message });
+    }
+});
 
 // GET /api/user/get_nonce?address=...
 router.get(['/api/user/get_nonce', '/api/user/get-nonce'], (req, res) => {

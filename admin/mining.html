@@ -177,10 +177,8 @@
               <div class="action-buttons">
                 ${status==='redeeming' ? `
                     <button class="btn-approve" data-id="${r.orderId}">Approve Redeem</button>
-                    <button class="btn-done" data-id="${r.orderId}">Done</button>
                     <button class="btn-delete" data-id="${r.orderId}">Delete</button>
                   ` : `
-                    <button class="btn-done" data-id="${r.orderId}">Done</button>
                     <button class="btn-delete" data-id="${r.orderId}">Delete</button>
                   `}
               </div>
@@ -195,16 +193,6 @@
       $('.btn-approve').off('click').on('click', function(){
         const id = $(this).data('id');
         approveRedeem(id, $(this));
-      });
-      $('.btn-done').off('click').on('click', function(){
-        const id = $(this).data('id');
-        if(!confirm('Mark mining record '+id+' as Done?')) return;
-        const btn = $(this);
-        btn.prop('disabled', true);
-        const rec = allRecords.find(r=> (r.orderId||r.id)==id );
-        if(rec){ rec.status = 'redeemed'; }
-        btn.replaceWith('<span class="done-badge">Done</span>');
-        displayPage(currentPage);
       });
       $('.btn-delete').off('click').on('click', function(){
         const id = $(this).data('id');
