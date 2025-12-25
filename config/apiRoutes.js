@@ -6,8 +6,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('./database');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const fs = require('fs');
+
+function uuidv4() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+}
 const path = require('path');
 const https = require('https');
 const ethers = require('ethers');
